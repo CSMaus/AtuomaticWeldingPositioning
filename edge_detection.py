@@ -1,7 +1,8 @@
 import os
 import cv2
 
-videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
+videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
+# videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
 # this_video_path = os.path.join(videos_path, os.listdir(videos_path)[0])
 this_video_path = os.path.join(videos_path, "rb_test7.mp4")
 cap = cv2.VideoCapture(this_video_path)

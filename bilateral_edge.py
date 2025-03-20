@@ -2,7 +2,8 @@ import os
 import cv2
 from light_enhance import *
 
-videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
+videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
+# videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
 this_video_path = os.path.join(videos_path, os.listdir(videos_path)[1])
 # this_video_path = os.path.join(videos_path, "rb6.360mm & 30d.mp4")  # "rb_test7.mp4")
 cap = cv2.VideoCapture(this_video_path)
@@ -45,7 +46,7 @@ def detect_v_shaped_electrode(edges, frame):
         return electrode_x, electrode_y
     return None, None
 
-def clahe_light_frame(f):
+'''def clahe_light_frame(f):
     brightness = cv2.getTrackbarPos("Brightness", "Brightness & CLAHE Controls")
     contrast = cv2.getTrackbarPos("Contrast", "Brightness & CLAHE Controls")
     vibrance = cv2.getTrackbarPos("Vibrance", "Brightness & CLAHE Controls") / 10
@@ -62,7 +63,7 @@ def clahe_light_frame(f):
                                        lightness,
                                        clip_limit,
                                        int(tile_grid_size))
-    return adjusted_frame
+    return adjusted_frame'''
 def process_frame(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -126,7 +127,6 @@ def set_frame(pos):
     cap.set(cv2.CAP_PROP_POS_FRAMES, pos)
     frame_pos = pos
 
-
 def toggle_pause():
     global frame_paused
     frame_paused = not frame_paused
@@ -137,22 +137,22 @@ def toggle_clahe_light():
 
 frame_width, frame_height = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-cv2.namedWindow("Welding Analysis", cv2.WINDOW_NORMAL)
-cv2.resizeWindow("Welding Analysis", frame_width, frame_height)  #  // 2
+welding_video_window = "Welding Analysis"
+cv2.namedWindow(welding_video_window, cv2.WINDOW_NORMAL)
+# cv2.resizeWindow(welding_video_window, frame_width, frame_height)  #  // 2
+# cv2.namedWindow("Filter Controls", cv2.WINDOW_NORMAL)
+# cv2.resizeWindow("Filter Controls", 400, 300)
 
-cv2.namedWindow("Filter Controls", cv2.WINDOW_NORMAL)
-cv2.resizeWindow("Filter Controls", 400, 300)
+cv2.createTrackbar("Canny Min", welding_video_window, 50, 255, nothing)
+cv2.createTrackbar("Canny Max", welding_video_window, 150, 255, nothing)
+cv2.createTrackbar("Sobel ksize", welding_video_window, 1, 10, nothing)
+cv2.createTrackbar("Threshold", welding_video_window, 50, 255, nothing)
+cv2.createTrackbar("Bilateral d", welding_video_window, 5, 25, nothing)
+cv2.createTrackbar("Bilateral SigmaColor", welding_video_window, 75, 250, nothing)
+cv2.createTrackbar("Bilateral SigmaSpace", welding_video_window, 75, 250, nothing)
+cv2.createTrackbar("Frame", welding_video_window, 0, total_frames - 1, set_frame)
 
-cv2.createTrackbar("Canny Min", "Filter Controls", 50, 255, nothing)
-cv2.createTrackbar("Canny Max", "Filter Controls", 150, 255, nothing)
-cv2.createTrackbar("Sobel ksize", "Filter Controls", 1, 10, nothing)
-cv2.createTrackbar("Threshold", "Filter Controls", 50, 255, nothing)
-cv2.createTrackbar("Bilateral d", "Filter Controls", 5, 25, nothing)
-cv2.createTrackbar("Bilateral SigmaColor", "Filter Controls", 75, 250, nothing)
-cv2.createTrackbar("Bilateral SigmaSpace", "Filter Controls", 75, 250, nothing)
-cv2.createTrackbar("Frame", "Welding Analysis", 0, total_frames - 1, set_frame)
-
-clahe_window_name = "Brightness & CLAHE Controls"
+'''clahe_window_name = "Brightness & CLAHE Controls"
 cv2.namedWindow(clahe_window_name, cv2.WINDOW_NORMAL)
 cv2.resizeWindow(clahe_window_name, 400, 300)
 cv2.createTrackbar("Brightness", clahe_window_name, 50, 100, nothing)
@@ -163,7 +163,7 @@ cv2.createTrackbar("Saturation", clahe_window_name, 50, 100, nothing)
 cv2.createTrackbar("Lightness", clahe_window_name, 50, 100, nothing)
 cv2.createTrackbar("CLAHE Clip Limit", clahe_window_name, 50, 100, nothing)
 cv2.createTrackbar("CLAHE Tile Grid Size", clahe_window_name, 12, 42, nothing)
-
+'''
 
 while True:
     ret, frame = cap.read()
@@ -173,13 +173,13 @@ while True:
     if frame_paused:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
 
-    if doCLAHE_light:
-        frame = clahe_light_frame(frame)
+    # if doCLAHE_light:
+    #     frame = clahe_light_frame(frame)
     processed_frame = process_frame(frame)
 
     current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-    cv2.setTrackbarPos("Frame", "Welding Analysis", current_frame)
-    cv2.imshow("Welding Analysis", processed_frame)
+    cv2.setTrackbarPos("Frame", welding_video_window, current_frame)
+    cv2.imshow(welding_video_window, processed_frame)
 
     key = cv2.waitKey(1) & 0xFF
     if key == ord("q"):
@@ -188,8 +188,8 @@ while True:
         cv2.waitKey(0)
     elif key == ord(" "):
         toggle_pause()
-    elif key == ord("C") and cv2.EVENT_FLAG_SHIFTKEY:
-        toggle_clahe_light()
+    # elif key == ord("C") and cv2.EVENT_FLAG_SHIFTKEY:
+    #     toggle_clahe_light()
     elif key == 27:
         break
 
