@@ -2,9 +2,9 @@ import os
 import cv2
 from light_enhance import *
 
-videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
-# videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
-this_video_path = os.path.join(videos_path, os.listdir(videos_path)[1])
+# videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
+videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
+this_video_path = os.path.join(videos_path, os.listdir(videos_path)[11])
 # this_video_path = os.path.join(videos_path, "rb6.360mm & 30d.mp4")  # "rb_test7.mp4")
 cap = cv2.VideoCapture(this_video_path)
 
@@ -139,18 +139,19 @@ frame_width, frame_height = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(
 
 welding_video_window = "Welding Analysis"
 cv2.namedWindow(welding_video_window, cv2.WINDOW_NORMAL)
-# cv2.resizeWindow(welding_video_window, frame_width, frame_height)  #  // 2
-# cv2.namedWindow("Filter Controls", cv2.WINDOW_NORMAL)
-# cv2.resizeWindow("Filter Controls", 400, 300)
-
-cv2.createTrackbar("Canny Min", welding_video_window, 50, 255, nothing)
-cv2.createTrackbar("Canny Max", welding_video_window, 150, 255, nothing)
-cv2.createTrackbar("Sobel ksize", welding_video_window, 1, 10, nothing)
-cv2.createTrackbar("Threshold", welding_video_window, 50, 255, nothing)
-cv2.createTrackbar("Bilateral d", welding_video_window, 5, 25, nothing)
-cv2.createTrackbar("Bilateral SigmaColor", welding_video_window, 75, 250, nothing)
-cv2.createTrackbar("Bilateral SigmaSpace", welding_video_window, 75, 250, nothing)
 cv2.createTrackbar("Frame", welding_video_window, 0, total_frames - 1, set_frame)
+# cv2.resizeWindow(welding_video_window, frame_width, frame_height)  #  // 2
+
+filter_controls_window = "Filter Controls"
+cv2.namedWindow(filter_controls_window, cv2.WINDOW_NORMAL)
+cv2.resizeWindow(filter_controls_window, 400, 300)
+cv2.createTrackbar("Canny Min", filter_controls_window, 50, 255, nothing)
+cv2.createTrackbar("Canny Max", filter_controls_window, 150, 255, nothing)
+cv2.createTrackbar("Sobel ksize", filter_controls_window, 1, 10, nothing)
+cv2.createTrackbar("Threshold", filter_controls_window, 50, 255, nothing)
+cv2.createTrackbar("Bilateral d", filter_controls_window, 5, 25, nothing)
+cv2.createTrackbar("Bilateral SigmaColor", filter_controls_window, 75, 250, nothing)
+cv2.createTrackbar("Bilateral SigmaSpace", filter_controls_window, 75, 250, nothing)
 
 '''clahe_window_name = "Brightness & CLAHE Controls"
 cv2.namedWindow(clahe_window_name, cv2.WINDOW_NORMAL)
