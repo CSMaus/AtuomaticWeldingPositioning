@@ -1,7 +1,9 @@
 # inspired by  "A Real-time Passive Vision System for Robotic Arc Welding" 2015, Jinchao Liu, Zhun Fan
+# here ransac for electrode curve and central line, and kalman filters for temporal smoothing
 import os
 import cv2
 import numpy as np
+import random
 from sklearn.linear_model import RANSACRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
@@ -13,7 +15,32 @@ total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 frame_paused = False
 frame_pos = 0
 
+rseed = 42
+np.random.seed(rseed)
+random.seed(rseed)
+
+def update_rseed(value):
+    global rseed
+    rseed = value
+    np.random.seed(rseed)
+    random.seed(rseed)
+
 def nothing(x): pass
+
+def split_contours_by_position(contours, y_threshold):
+    upper = []
+    lower = []
+    for cnt in contours:
+        for p in cnt:
+            x, y = p[0]
+            if y < y_threshold:
+                upper.append(cnt)
+                break
+            elif y >= y_threshold:
+                lower.append(cnt)
+                break
+    return upper, lower
+
 
 def ransac_polynomial_curve(contours, degree=20, residual_threshold=5):
     # RANSAC with polynomial regression
@@ -55,17 +82,28 @@ def process_frame(frame):
     # remove small contours which should be counted as outliners
     min_contour_len = 150 # 30
     filtered_contours = [cnt for cnt in contours if cv2.arcLength(cnt, False) > min_contour_len]
-    cv2.drawContours(frame, filtered_contours, -1, (0, 0, 255), 3)
+    # cv2.drawContours(frame, filtered_contours, -1, (0, 0, 255), 1)
+
+    y_cutoff = gray.shape[0] // 2
+    upper_contours, lower_contours = split_contours_by_position(filtered_contours, y_cutoff)
+    cv2.drawContours(frame, upper_contours, -1, (0, 0, 255), 1)  # red for electrode
+    cv2.drawContours(frame, lower_contours, -1, (255, 0, 0), 1)  # blue for bottom line
 
 
     r_deg = max(1, cv2.getTrackbarPos("RANSAC Degree", "Filter Controls"))
     residual_thresh = max(1, cv2.getTrackbarPos("Residual Threshold", "Filter Controls"))
-    x_fit, y_fit = ransac_polynomial_curve(filtered_contours, degree=r_deg, residual_threshold=residual_thresh)
 
-    # x_fit, y_fit = ransac_polynomial_curve(contours, degree=2, residual_threshold=5)
-    # if x_fit is not None:
-        # for x, y in zip(x_fit, y_fit):
-            # cv2.circle(frame, (int(x.item()), int(y.item())), 1, (0, 255, 0), -1)  # green
+    # electrode
+    x_fit, y_fit = ransac_polynomial_curve(upper_contours, degree=r_deg, residual_threshold=residual_thresh)
+    if x_fit is not None:
+        for x, y in zip(x_fit, y_fit):
+            cv2.circle(frame, (int(x.item()), int(y.item())), 1, (0, 255, 0), -1)  # green
+
+    # central line
+    x_line, y_line = ransac_polynomial_curve(lower_contours, degree=1, residual_threshold=5)
+    if x_line is not None:
+        for x, y in zip(x_line, y_line):
+            cv2.circle(frame, (int(x.item()), int(y.item())), 1, (255, 255, 0), -1)  # cyan
 
     return frame
 
@@ -79,8 +117,8 @@ def toggle_pause():
     frame_paused = not frame_paused
 
 # UI
-cv2.namedWindow("WeldingAnalysis", cv2.WINDOW_NORMAL)
-cv2.createTrackbar("Frame", "WeldingAnalysis", 0, total_frames - 1, set_frame)
+cv2.namedWindow("Welding Analysis2", cv2.WINDOW_NORMAL)
+cv2.createTrackbar("Frame", "Welding Analysis2", 0, total_frames - 1, set_frame)
 
 cv2.namedWindow("Filter Controls", cv2.WINDOW_NORMAL)
 cv2.resizeWindow("Filter Controls", 400, 300)
@@ -91,6 +129,7 @@ cv2.createTrackbar("Bilateral SigmaColor", "Filter Controls", 75, 250, nothing)
 cv2.createTrackbar("Bilateral SigmaSpace", "Filter Controls", 75, 250, nothing)
 cv2.createTrackbar("RANSAC Degree", "Filter Controls", 1, 250, nothing)
 cv2.createTrackbar("Residual Threshold", "Filter Controls", 1, 250, nothing)
+cv2.createTrackbar("Random Seed", "Filter Controls", 1, 250, update_rseed)
 
 while True:
     ret, frame = cap.read()
@@ -102,8 +141,8 @@ while True:
 
     processed_frame = process_frame(frame)
     current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-    cv2.setTrackbarPos("Frame", "WeldingAnalysis", current_frame)
-    cv2.imshow("WeldingAnalysis", processed_frame)
+    cv2.setTrackbarPos("Frame", "Welding Analysis2", current_frame)
+    cv2.imshow("Welding Analysis2", processed_frame)
 
     key = cv2.waitKey(1) & 0xFF
     if key == ord("q") or key == 27:
