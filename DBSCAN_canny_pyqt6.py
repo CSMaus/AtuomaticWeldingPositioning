@@ -10,6 +10,7 @@ import sys
 from sklearn.linear_model import RANSACRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
+from phasepack import phasecong
 
 videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
 # videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
@@ -30,6 +31,37 @@ MAX_HISTORY = 5
 num_clusters_to_ex = 2
 
 # here will be the code for the joint line detection
+def detect_joint_line_fast0(gray):
+    thetas = [0, np.pi/12, -np.pi/12]  # Near-vertical angles
+    responses = []
+
+    for theta in thetas:
+        kernel = cv2.getGaborKernel((21, 21), 5.0, theta, 10.0, 0.95, 0, ktype=cv2.CV_32F)
+        filtered = cv2.filter2D(gray, cv2.CV_8UC3, kernel)
+        responses.append(filtered)
+
+    combined = np.max(np.stack(responses), axis=0)
+    _, binary = cv2.threshold(combined, 250, 255, cv2.THRESH_BINARY)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+
+    return binary
+def detect_joint_line_fast(gray):
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(gray)
+
+    vertical_kernel = np.array([[-1], [-1], [4], [-1], [-1]], dtype=np.float32)
+    line_enhanced = cv2.filter2D(enhanced, -1, vertical_kernel)
+
+    _, binary = cv2.threshold(line_enhanced, 30, 255, cv2.THRESH_BINARY)
+
+    vertical = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 15))
+    clean = cv2.morphologyEx(binary, cv2.MORPH_OPEN, vertical)
+
+    h, w = clean.shape
+    center_weight = np.exp(-((np.arange(w) - w // 2) ** 2) / (2 * (w * 0.1) ** 2))
+    clean = (clean * center_weight.astype(np.uint8)).astype(np.uint8)
+
+    return clean
 
 def get_cluster_centers(clusters):
     return [np.mean(c.reshape(-1, 2), axis=0) for c in clusters]
@@ -98,6 +130,11 @@ def process_frame(frame, params):
     global last_good_center, last_good_index, cluster_history
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     filtered = cv2.bilateralFilter(gray, params['d'], params['sigmaColor'], params['sigmaSpace'])
+
+    joint_line_mask = detect_joint_line_fast(gray)
+    frame[joint_line_mask > 0] = (255, 0, 255)
+
+
     edges = cv2.Canny(filtered, params['canny_min'], params['canny_max'])
 
     if num_clusters_to_ex < 2:
@@ -130,7 +167,10 @@ def process_frame(frame, params):
                     cv2.circle(frame, (int(x.item()), int(y.item())), radius=1, color=(0, 0, 255), thickness=-1)
                     # f 0 <= x < frame.shape[1] and 0 <= y < frame.shape[0]:
                     #     frame[y, x] = (0, 0, 255)  # 255 0 0 # 0 255 255 yellow
-                cv2.circle(frame, find_lowest_point_smooth(x_fit, y_fit), radius=4, color=(255, 10, 255), thickness=-1)
+                point = find_lowest_point_smooth(x_fit, y_fit)
+                cv2.circle(frame, point, radius=4, color=(255, 10, 10), thickness=-1)
+                cv2.putText(frame, "Electrode", (point[0], point[1] + 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 10, 10), 2)
         '''for i, cluster in enumerate(clusters):
             # color = colors[i % len(colors)]
             if i >= len(colors):
