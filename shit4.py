@@ -39,9 +39,6 @@ def find_consistent_cluster_index(cluster_centers, last_center, max_distance=40)
 
     return best_index if best_index is not None else 0
 
-
-
-
 def nothing(x): pass
 def set_frame(pos): global frame_pos; cap.set(cv2.CAP_PROP_POS_FRAMES, pos); frame_pos = pos
 def toggle_pause(): global frame_paused; frame_paused = not frame_paused
