@@ -7,14 +7,18 @@ from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QSlider, QPushButton,
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 import sys
+from sklearn.linear_model import RANSACRegressor
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import make_pipeline
 
-# Video path
-videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
-this_video_path = os.path.join(videos_path, os.listdir(videos_path)[10])
+videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
+# videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
+# this_video_path = os.path.join(videos_path, os.listdir(videos_path)[10])
+this_video_path = os.path.join(videos_path, "rb_test7.mp4")  # "rb_test7.mp4")  # "rb6.360mm & 30d.mp4"
+
 cap = cv2.VideoCapture(this_video_path)
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-# Globals
 frame_paused = False
 frame_pos = 0
 last_good_center = None
@@ -24,6 +28,8 @@ last_good_index = None
 cluster_history = []
 MAX_HISTORY = 5
 num_clusters_to_ex = 2
+
+# here will be the code for the joint line detection
 
 def get_cluster_centers(clusters):
     return [np.mean(c.reshape(-1, 2), axis=0) for c in clusters]
@@ -55,6 +61,39 @@ def extract_all_clusters(edges, eps, min_samples, leaf_size):
         clusters.append(cluster_pts.reshape(-1, 1, 2))
     return clusters
 
+def ransac_polynomial_curve(points, degree=2, residual_threshold=5):
+    if len(points) < degree + 1:
+        return None, None
+    points = points.reshape(-1, 2)
+    X = points[:, 0].reshape(-1, 1)
+    y = points[:, 1]
+    model = make_pipeline(PolynomialFeatures(degree),
+                          RANSACRegressor(residual_threshold=residual_threshold,
+                                          random_state=42))
+    model.fit(X, y)
+    x_range = np.linspace(X.min(), X.max(), 300).reshape(-1, 1)
+    y_range = model.predict(x_range)
+    return x_range.astype(int), y_range.astype(int)
+
+def find_lowest_point(x_fit, y_fit):
+    x_fit = x_fit.flatten()
+    y_fit = y_fit.flatten()
+    idx = np.argmax(y_fit)  # bottom y is the derivative
+    return int(x_fit[idx].item()), int(y_fit[idx].item())
+
+previous_bottom = None  # define globally
+def find_lowest_point_smooth(x_fit, y_fit, alpha=0.7):
+    global previous_bottom
+    x_fit = x_fit.flatten()
+    y_fit = y_fit.flatten()
+    idx = np.argmax(y_fit)
+    new_bottom = np.array([x_fit[idx].item(), y_fit[idx].item()])
+    if previous_bottom is None:
+        previous_bottom = new_bottom
+    else:
+        previous_bottom = alpha * previous_bottom + (1 - alpha) * new_bottom
+    return tuple(previous_bottom.astype(int))
+
 def process_frame(frame, params):
     global last_good_center, last_good_index, cluster_history
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -84,6 +123,14 @@ def process_frame(frame, params):
             last_good_index = idx
             for pt in selected:
                 cv2.circle(frame, tuple(pt[0]), 1, (0, 255, 0), -1)
+
+            x_fit, y_fit = ransac_polynomial_curve(selected, degree=2, residual_threshold=2)
+            if x_fit is not None:
+                for x, y in zip(x_fit, y_fit):
+                    cv2.circle(frame, (int(x.item()), int(y.item())), radius=1, color=(0, 0, 255), thickness=-1)
+                    # f 0 <= x < frame.shape[1] and 0 <= y < frame.shape[0]:
+                    #     frame[y, x] = (0, 0, 255)  # 255 0 0 # 0 255 255 yellow
+                cv2.circle(frame, find_lowest_point_smooth(x_fit, y_fit), radius=4, color=(255, 10, 255), thickness=-1)
         '''for i, cluster in enumerate(clusters):
             # color = colors[i % len(colors)]
             if i >= len(colors):
