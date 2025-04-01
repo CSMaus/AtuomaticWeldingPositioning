@@ -5,13 +5,42 @@ from sklearn.cluster import DBSCAN
 import random
 
 
+# videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
 videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
 this_video_path = os.path.join(videos_path, os.listdir(videos_path)[10])
+# this_video_path = os.path.join(videos_path, "rb6.360mm & 30d.mp4")  # "rb_test7.mp4")
 cap = cv2.VideoCapture(this_video_path)
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 frame_paused = False
 frame_pos = 0
 num_clusters_to_ex = 2
+
+# ############################
+cluster_history = []
+MAX_HISTORY = 5
+last_good_center = None
+last_good_index = None
+
+def get_cluster_centers(clusters):
+    return [np.mean(c.reshape(-1, 2), axis=0) for c in clusters]
+
+def find_consistent_cluster_index(cluster_centers, last_center, max_distance=40):
+    if last_center is None or not cluster_centers:
+        return 0  # default to first cluster initially
+
+    best_index = None
+    best_distance = float('inf')
+
+    for i, curr in enumerate(cluster_centers):
+        dist = np.linalg.norm(np.array(curr) - np.array(last_center))
+        if dist < best_distance and dist < max_distance:
+            best_distance = dist
+            best_index = i
+
+    return best_index if best_index is not None else 0
+
+
+
 
 def nothing(x): pass
 def set_frame(pos): global frame_pos; cap.set(cv2.CAP_PROP_POS_FRAMES, pos); frame_pos = pos
@@ -63,6 +92,8 @@ def extract_all_clusters(edges):
 
 
 def process_frame(frame):
+    global cluster_history
+
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     d = max(1, cv2.getTrackbarPos("Bilateral d", "Filter Controls"))
@@ -81,14 +112,25 @@ def process_frame(frame):
                 cv2.circle(frame, tuple(pt[0]), 1, (0, 255, 0), -1)
     else:
         clusters = extract_all_clusters(edges)
-        colors = [(0, 255, 0), (0, 0, 255), (255, 0, 0), (0, 255, 255)]
-        for i, cluster in enumerate(clusters):
+        centers = [np.mean(c.reshape(-1, 2), axis=0) for c in clusters]
+
+        global last_good_center, last_good_index
+        idx = find_consistent_cluster_index(centers, last_good_center)
+
+        if idx < len(clusters):
+            selected = clusters[idx]
+            last_good_center = centers[idx]
+            last_good_index = idx
+            for pt in selected:
+                cv2.circle(frame, tuple(pt[0]), 1, (0, 255, 0), -1)
+
+        '''for i, cluster in enumerate(clusters):
             # color = colors[i % len(colors)]
             if i >= len(colors):
                 colors.append(generate_new_color(colors))
             color = colors[i]
             for pt in cluster:
-                cv2.circle(frame, tuple(pt[0]), 1, color, -1)
+                cv2.circle(frame, tuple(pt[0]), 1, color, -1)'''
 
     return frame
 
@@ -114,9 +156,13 @@ def set_standart_tracks():
     cv2.setTrackbarPos("Bilateral d", "Filter Controls", 20)
     cv2.setTrackbarPos("Bilateral SigmaColor", "Filter Controls", 200)
     cv2.setTrackbarPos("Bilateral SigmaSpace", "Filter Controls", 200)
-    cv2.setTrackbarPos("epsilon", "Filter Controls", 15)
+    cv2.setTrackbarPos("epsilon", "Filter Controls", 8)
     cv2.setTrackbarPos("min_samples", "Filter Controls", 10)
     cv2.setTrackbarPos("leaf_size", "Filter Controls", 50)
+
+
+
+
 
 
 set_standart_tracks()
