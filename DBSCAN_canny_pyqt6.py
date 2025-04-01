@@ -15,13 +15,14 @@ from phasepack import phasecong
 videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
 # videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
 # this_video_path = os.path.join(videos_path, os.listdir(videos_path)[10])
-this_video_path = os.path.join(videos_path, "rb_test7.mp4")  # "rb_test7.mp4")  # "rb6.360mm & 30d.mp4"
+this_video_path = os.path.join(videos_path, "rb_test8.mp4")  # "rb_test7.mp4")  # "rb6.360mm & 30d.mp4"
 
 cap = cv2.VideoCapture(this_video_path)
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
 frame_paused = False
 frame_pos = 0
+residual_thresh = 15
 last_good_center = None
 last_good_index = None
 
@@ -114,7 +115,8 @@ def find_lowest_point(x_fit, y_fit):
     return int(x_fit[idx].item()), int(y_fit[idx].item())
 
 previous_bottom = None  # define globally
-def find_lowest_point_smooth(x_fit, y_fit, alpha=0.7):
+def find_lowest_point_smooth(x_fit, y_fit, alpha=0.98):
+    # higher aloha - smoother
     global previous_bottom
     x_fit = x_fit.flatten()
     y_fit = y_fit.flatten()
@@ -131,8 +133,9 @@ def process_frame(frame, params):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     filtered = cv2.bilateralFilter(gray, params['d'], params['sigmaColor'], params['sigmaSpace'])
 
-    joint_line_mask = detect_joint_line_fast(gray)
-    frame[joint_line_mask > 0] = (255, 0, 255)
+    # this doesn't work
+    # joint_line_mask = detect_joint_line_fast(gray)
+    # frame[joint_line_mask > 0] = (255, 0, 255)
 
 
     edges = cv2.Canny(filtered, params['canny_min'], params['canny_max'])
@@ -161,7 +164,7 @@ def process_frame(frame, params):
             for pt in selected:
                 cv2.circle(frame, tuple(pt[0]), 1, (0, 255, 0), -1)
 
-            x_fit, y_fit = ransac_polynomial_curve(selected, degree=2, residual_threshold=2)
+            x_fit, y_fit = ransac_polynomial_curve(selected, degree=2, residual_threshold=residual_thresh)
             if x_fit is not None:
                 for x, y in zip(x_fit, y_fit):
                     cv2.circle(frame, (int(x.item()), int(y.item())), radius=1, color=(0, 0, 255), thickness=-1)
@@ -171,6 +174,7 @@ def process_frame(frame, params):
                 cv2.circle(frame, point, radius=4, color=(255, 10, 10), thickness=-1)
                 cv2.putText(frame, "Electrode", (point[0], point[1] + 20),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 10, 10), 2)
+
         '''for i, cluster in enumerate(clusters):
             # color = colors[i % len(colors)]
             if i >= len(colors):
@@ -204,9 +208,17 @@ class SliderWindow(QWidget):
         layout.addWidget(QLabel("Frame"), len(main_app.params), 0)
         layout.addWidget(self.frame_selector, len(main_app.params), 1)
 
+        self.residual_threshold_selector = QSpinBox()
+        self.residual_threshold_selector.setRange(1, 30)
+        self.residual_threshold_selector.setValue(residual_thresh)
+        self.residual_threshold_selector.valueChanged.connect(main_app.set_residual_threshold)
+        layout.addWidget(QLabel("ResThresh"), len(main_app.params) + 1, 0)
+        layout.addWidget(self.residual_threshold_selector, len(main_app.params) + 1, 1)
+
         self.setLayout(layout)
         self.main_app.slider_refs = self.sliders
         self.main_app.frame_selector = self.frame_selector
+        self.main_app.residual_threshold_selector = self.residual_threshold_selector
 
 class VideoApp(QWidget):
     def __init__(self):
@@ -216,7 +228,7 @@ class VideoApp(QWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self.next_frame)
         self.params = {
-            'canny_min': 98,
+            'canny_min': 120,
             'canny_max': 173,
             'd': 20,
             'sigmaColor': 200,
@@ -248,6 +260,10 @@ class VideoApp(QWidget):
         global frame_pos, cap
         frame_pos = pos
         cap.set(cv2.CAP_PROP_POS_FRAMES, pos)
+
+    def set_residual_threshold(self, value):
+        global residual_thresh
+        residual_thresh = value
 
     def next_frame(self):
         global cap, frame_pos
