@@ -10,12 +10,12 @@ import sys
 from sklearn.linear_model import RANSACRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
-from phasepack import phasecong
+# from phasepack import phasecong
 
-videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
-# videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
-# this_video_path = os.path.join(videos_path, os.listdir(videos_path)[10])
-this_video_path = os.path.join(videos_path, "rb_test8.mp4")  # "rb_test7.mp4")  # "rb6.360mm & 30d.mp4"
+# videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
+videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
+this_video_path = os.path.join(videos_path, os.listdir(videos_path)[10])
+# this_video_path = os.path.join(videos_path, "rb_test8.mp4")  # "rb_test7.mp4")  # "rb6.360mm & 30d.mp4"
 
 cap = cv2.VideoCapture(this_video_path)
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -63,6 +63,96 @@ def detect_joint_line_fast(gray):
     clean = (clean * center_weight.astype(np.uint8)).astype(np.uint8)
 
     return clean
+def detect_join_line_by_edges(edges, electrode_point, electrode_width=50):
+    x_center, y_start = electrode_point
+    h, w = edges.shape
+    x_min = max(0, x_center - electrode_width // 2)
+    x_max = min(w, x_center + electrode_width // 2)
+    y_max = h
+
+    region = edges[y_start:y_max, x_min:x_max]
+    y_indices, x_indices = np.where(region > 0)
+
+    if len(x_indices) == 0:
+        return None
+
+    points = np.stack((x_indices + x_min, y_indices + y_start), axis=1)
+    clustering = DBSCAN(eps=10, min_samples=5).fit(points)
+    labels = clustering.labels_
+
+    clusters = []
+    for label in set(labels):
+        if label == -1:
+            continue
+        cluster_pts = points[labels == label]
+        clusters.append(cluster_pts.reshape(-1, 1, 2))
+
+    if not clusters:
+        return None
+
+    return max(clusters, key=lambda c: c[:, 0, 1].ptp())
+def detect_join_line_by_black_column(gray, electrode_point, electrode_width=50):
+    x_center, y_start = electrode_point
+    h, w = gray.shape
+    x_min = max(0, x_center - electrode_width // 2)
+    x_max = min(w, x_center + electrode_width // 2)
+    y_max = h
+
+    region = gray[y_start:y_max, x_min:x_max]
+    vertical_sums = np.sum(region, axis=0)
+    darkest_col_idx = np.argmin(vertical_sums)
+    x_dark = x_min + darkest_col_idx
+
+    column = gray[y_start:y_max, x_dark]
+    black_mask = column < 40
+    y_coords = np.where(black_mask)[0]
+
+    if len(y_coords) < 5:
+        return None
+
+    points = np.array([[x_dark, y + y_start] for y in y_coords]).reshape(-1, 1, 2)
+    return points
+def detect_vertical_join_line_ransac(original_frame, electrode_point, electrode_width=50):
+    # Parameters for separate pre-processing
+    bilateral_d = 3
+    sigmaColor = 51
+    sigmaSpace = 51
+    canny_min = 98
+    canny_max = 94
+
+    x_center, y_start = electrode_point
+    h, w = original_frame.shape[:2]
+    x_min = max(0, x_center - electrode_width // 2)
+    x_max = min(w, x_center + electrode_width // 2)
+    y_max = h
+
+    gray = cv2.cvtColor(original_frame, cv2.COLOR_BGR2GRAY)
+    filtered = cv2.bilateralFilter(gray, bilateral_d, sigmaColor, sigmaSpace)
+    edges = cv2.Canny(filtered, canny_min, canny_max)
+
+    region = edges[y_start:y_max, x_min:x_max]
+    y_indices, x_indices = np.where(region > 0)
+
+    if len(x_indices) == 0:
+        return None, None
+
+    points = np.stack((x_indices + x_min, y_indices + y_start), axis=1)
+
+    # RANSAC vertical line fitting (x = f(y))
+    if len(points) < 2:
+        return None, None
+
+    Y = points[:, 1].reshape(-1, 1)
+    X = points[:, 0]
+    model = make_pipeline(PolynomialFeatures(1), RANSACRegressor(residual_threshold=3, random_state=42))
+    model.fit(Y, X)
+    y_range = np.linspace(Y.min(), Y.max(), 200).reshape(-1, 1)
+    x_pred = model.predict(y_range)
+
+    return x_pred.astype(int), y_range.astype(int)
+
+
+
 
 def get_cluster_centers(clusters):
     return [np.mean(c.reshape(-1, 2), axis=0) for c in clusters]
@@ -115,7 +205,7 @@ def find_lowest_point(x_fit, y_fit):
     return int(x_fit[idx].item()), int(y_fit[idx].item())
 
 previous_bottom = None  # define globally
-def find_lowest_point_smooth(x_fit, y_fit, alpha=0.98):
+def find_lowest_point_smooth(x_fit, y_fit, alpha=0.9):
     # higher aloha - smoother
     global previous_bottom
     x_fit = x_fit.flatten()
@@ -175,6 +265,28 @@ def process_frame(frame, params):
                 cv2.putText(frame, "Electrode", (point[0], point[1] + 20),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 10, 10), 2)
 
+
+                # ###################################################
+                # ################################################
+                # Method 1: Edge-based vertical join line
+                # edge_line = detect_join_line_by_edges(edges, point, electrode_width=50)
+                # if edge_line is not None:
+                #     for pt in edge_line:
+                #         cv2.circle(frame, tuple(pt[0]), 1, (0, 255, 255), -1)
+
+                # Method 2: Black column detection
+                # black_line = detect_join_line_by_black_column(gray, point, electrode_width=50)
+                # if black_line is not None:
+                #     for pt in black_line:
+                #         cv2.circle(frame, tuple(pt[0]), 1, (255, 255, 0), -1)
+
+                # Method 3: vert line using edge detection below electrode and ransac
+                x_line, y_line = detect_vertical_join_line_ransac(original_frame=frame.copy(), electrode_point=point,
+                                                                  electrode_width=50)
+                if x_line is not None:
+                    for x, y in zip(x_line, y_line):
+                        cv2.circle(frame, (int(x.item()), int(y.item())), 1, (255, 0, 255), -1)
+                # ################################################  
         '''for i, cluster in enumerate(clusters):
             # color = colors[i % len(colors)]
             if i >= len(colors):

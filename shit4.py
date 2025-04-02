@@ -13,7 +13,7 @@ cap = cv2.VideoCapture(this_video_path)
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 frame_paused = False
 frame_pos = 0
-num_clusters_to_ex = 2
+num_clusters_to_ex = 3
 
 # ############################
 cluster_history = []
@@ -109,8 +109,14 @@ def process_frame(frame):
                 cv2.circle(frame, tuple(pt[0]), 1, (0, 255, 0), -1)
     else:
         clusters = extract_all_clusters(edges)
-        centers = [np.mean(c.reshape(-1, 2), axis=0) for c in clusters]
-
+        colors = [(0, 255, 0), (0, 0, 255), (255, 0, 0), (0, 255, 255)]
+        for i, cluster in enumerate(clusters):
+            if i >= len(colors):
+                colors.append(generate_new_color(colors))
+            color = colors[i]
+            for pt in cluster:
+                cv2.circle(frame, tuple(pt[0]), 1, color, -1)
+        '''
         global last_good_center, last_good_index
         idx = find_consistent_cluster_index(centers, last_good_center)
 
@@ -120,14 +126,8 @@ def process_frame(frame):
             last_good_index = idx
             for pt in selected:
                 cv2.circle(frame, tuple(pt[0]), 1, (0, 255, 0), -1)
+        '''
 
-        '''for i, cluster in enumerate(clusters):
-            # color = colors[i % len(colors)]
-            if i >= len(colors):
-                colors.append(generate_new_color(colors))
-            color = colors[i]
-            for pt in cluster:
-                cv2.circle(frame, tuple(pt[0]), 1, color, -1)'''
 
     return frame
 
