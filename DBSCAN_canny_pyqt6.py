@@ -14,7 +14,7 @@ from sklearn.pipeline import make_pipeline
 
 # videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
 videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
-this_video_path = os.path.join(videos_path, os.listdir(videos_path)[10])
+this_video_path = os.path.join(videos_path, os.listdir(videos_path)[11])
 # this_video_path = os.path.join(videos_path, "rb_test8.mp4")  # "rb_test7.mp4")  # "rb6.360mm & 30d.mp4"
 
 cap = cv2.VideoCapture(this_video_path)
@@ -25,6 +25,7 @@ frame_pos = 0
 residual_thresh = 15
 last_good_center = None
 last_good_index = None
+smoothed_line_x = None  # the center line which should be groove center
 
 # ############################
 cluster_history = []
@@ -151,7 +152,16 @@ def detect_vertical_join_line_ransac(original_frame, electrode_point, electrode_
 
     return x_pred.astype(int), y_range.astype(int)
 
+def smooth_vertical_line(x_pred, alpha=0.8):
+    global smoothed_line_x
+    x_pred = x_pred.flatten()
 
+    if smoothed_line_x is None or len(smoothed_line_x) != len(x_pred):
+        smoothed_line_x = x_pred.copy()
+    else:
+        smoothed_line_x = alpha * smoothed_line_x + (1 - alpha) * x_pred
+
+    return smoothed_line_x.astype(int)
 
 
 def get_cluster_centers(clusters):
@@ -281,12 +291,21 @@ def process_frame(frame, params):
                 #         cv2.circle(frame, tuple(pt[0]), 1, (255, 255, 0), -1)
 
                 # Method 3: vert line using edge detection below electrode and ransac
-                x_line, y_line = detect_vertical_join_line_ransac(original_frame=frame.copy(), electrode_point=point,
+                '''x_line, y_line = detect_vertical_join_line_ransac(original_frame=frame.copy(), electrode_point=point,
                                                                   electrode_width=50)
                 if x_line is not None:
                     for x, y in zip(x_line, y_line):
+                        cv2.circle(frame, (int(x.item()), int(y.item())), 1, (255, 0, 255), -1)'''
+
+                # Method 4: smoothing method 3
+                x_line, y_line = detect_vertical_join_line_ransac(frame.copy(), electrode_point=point,
+                                                                  electrode_width=50)
+                if x_line is not None:
+                    x_line_smooth = smooth_vertical_line(x_line, alpha=0.92)
+                    for x, y in zip(x_line_smooth, y_line):
                         cv2.circle(frame, (int(x.item()), int(y.item())), 1, (255, 0, 255), -1)
-                # ################################################  
+
+                # ################################################
         '''for i, cluster in enumerate(clusters):
             # color = colors[i % len(colors)]
             if i >= len(colors):
