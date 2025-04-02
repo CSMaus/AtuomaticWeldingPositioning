@@ -3,7 +3,7 @@ import cv2
 from light_enhance import *
 
 # videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
-videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
+videos_path = "D:/ML_DL_AI_stuff/!!DoosanWelding2025/data/"
 this_video_path = os.path.join(videos_path, os.listdir(videos_path)[11])
 # this_video_path = os.path.join(videos_path, "rb6.360mm & 30d.mp4")  # "rb_test7.mp4")
 cap = cv2.VideoCapture(this_video_path)
