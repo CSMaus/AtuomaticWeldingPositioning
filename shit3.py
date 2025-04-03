@@ -7,7 +7,7 @@ from sklearn.linear_model import RANSACRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
-videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
+videos_path = "D:/ML_DL_AI_stuff/!!DoosanWelding2025/data/"
 this_video_path = os.path.join(videos_path, os.listdir(videos_path)[10]) # 11
 cap = cv2.VideoCapture(this_video_path)
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
