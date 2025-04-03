@@ -1,2 +1,5 @@
 /.idea
 /__pycache__
+/CNN/ds_imgs
+/CNN/masks
+*.zip

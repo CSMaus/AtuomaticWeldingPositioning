@@ -26,7 +26,7 @@ last_good_center = None
 last_good_index = None
 smoothed_line_x = None
 all_clusters = False
-
+previous_bottom = None
 
 def detect_vertical_join_line_ransac(original_frame, electrode_point, electrode_width=50):
     # Parameters for separate pre-processing
@@ -77,7 +77,6 @@ def smooth_vertical_line(x_pred, alpha=0.8):
 
     return smoothed_line_x.astype(int)
 
-previous_bottom = None
 def find_lowest_point_smooth(x_fit, y_fit, alpha=0.9):
     # higher aloha - smoother
     global previous_bottom
