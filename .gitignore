@@ -3,3 +3,6 @@
 /CNN/ds_imgs
 /CNN/masks
 *.zip
+/CNN/electrode_groove_seg8
+*.png
+*.jpg
