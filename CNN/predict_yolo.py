@@ -1,12 +1,13 @@
 # open wideo and save selected frames by pressing "s"
 import os
 import cv2
+import numpy as np
 from ultralytics import YOLO
 
 videos_path = "D:/ML_DL_AI_stuff/!!DoosanWelding2025/data/"
 # this_video_path = os.path.join(videos_path, os.listdir(videos_path)[11])
 # "rb6.360mm & 30d.mp4")  # "rb_test7.mp4")
-video_name = "rb_test6"
+video_name = "rb_test8"
 this_video_path = os.path.join(videos_path, f"{video_name}.mp4")
 cap = cv2.VideoCapture(this_video_path)
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -62,7 +63,8 @@ def predict_yolo(curr_frame):
     return labeled
 
 
-
+# Warm-up YOLO with a dummy image
+_ = yolo_model.predict(np.zeros((640, 640, 3), dtype=np.uint8), verbose=False)
 cv2.namedWindow("Welding Analysis", cv2.WINDOW_NORMAL)
 cv2.createTrackbar("Frame", "Welding Analysis", 0, total_frames - 1, set_frame)
 
@@ -73,17 +75,17 @@ while True:
     if not ret:
         break
 
+    current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+    cv2.setTrackbarPos("Frame", "Welding Analysis", current_frame)
+
     if frame_paused:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
-        if labeled_frame is not None:
-            cv2.imshow("Welding Analysis", labeled_frame)
-        else:
-            cv2.imshow("Welding Analysis", frame)
+        display_frame = labeled_frame if labeled_frame is not None else frame
     else:
-        labeled_frame = None  # Reset prediction when video plays
-        current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-        cv2.setTrackbarPos("Frame", "Welding Analysis", current_frame)
-        cv2.imshow("Welding Analysis", frame)
+        labeled_frame = predict_yolo(frame)
+        display_frame = labeled_frame
+
+    cv2.imshow("Welding Analysis", display_frame)
 
     key = cv2.waitKey(1) & 0xFF
     if key == ord("q") or key == 27:
