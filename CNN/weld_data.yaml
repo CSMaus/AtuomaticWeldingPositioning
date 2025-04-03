@@ -1,0 +1,7 @@
+path: C:/Users/oem/Desktop/Kseniia/AtuomaticWeldingPositioning/CNN/dataset/
+train: images/train
+val: images/val
+
+names:
+  0: Electrode
+  1: groove_center
