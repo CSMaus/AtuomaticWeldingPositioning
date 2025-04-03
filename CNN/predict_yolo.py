@@ -75,9 +75,6 @@ while True:
     if not ret:
         break
 
-    current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-    cv2.setTrackbarPos("Frame", "Welding Analysis", current_frame)
-
     if frame_paused:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
         display_frame = labeled_frame if labeled_frame is not None else frame
@@ -85,6 +82,8 @@ while True:
         labeled_frame = predict_yolo(frame)
         display_frame = labeled_frame
 
+    current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+    cv2.setTrackbarPos("Frame", "Welding Analysis", current_frame)
     cv2.imshow("Welding Analysis", display_frame)
 
     key = cv2.waitKey(1) & 0xFF
