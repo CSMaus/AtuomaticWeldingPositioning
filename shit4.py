@@ -169,6 +169,8 @@ def ransac_polynomial_curve(points, degree=2, residual_threshold=5):
     x_range = np.linspace(X.min(), X.max(), 300).reshape(-1, 1)
     y_range = model.predict(x_range)
     return x_range.astype(int), y_range.astype(int)
+
+
 def process_frame(frame):
     global last_good_center, last_good_index, cluster_history
 
