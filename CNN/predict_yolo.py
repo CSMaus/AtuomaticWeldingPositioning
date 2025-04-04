@@ -16,6 +16,7 @@ frame_paused = False
 frame_pos = 0
 
 yolo_model = YOLO("runs/segment/electrode_groove_seg8/weights/best.pt")
+# yolo_model = YOLO("runs/electrode_groove_seg2/weights/best.pt")
 
 
 def set_frame(pos): global frame_pos; cap.set(cv2.CAP_PROP_POS_FRAMES, pos); frame_pos = pos
