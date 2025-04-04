@@ -8,7 +8,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
 
-# videos_path = "/Users/kseni/Downloads/0kakao/Robot REC/"
+# videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
 videos_path = "D:/ML_DL_AI_stuff/!!DoosanWelding2025/data/"
 # this_video_path = os.path.join(videos_path, os.listdir(videos_path)[11])
 # "rb6.360mm & 30d.mp4")  # "rb_test7.mp4")

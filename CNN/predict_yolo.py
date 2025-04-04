@@ -4,7 +4,8 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-videos_path = "D:/ML_DL_AI_stuff/!!DoosanWelding2025/data/"
+videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
+# videos_path = "D:/ML_DL_AI_stuff/!!DoosanWelding2025/data/"
 # this_video_path = os.path.join(videos_path, os.listdir(videos_path)[11])
 # "rb6.360mm & 30d.mp4")  # "rb_test7.mp4")
 video_name = "rb_test8"

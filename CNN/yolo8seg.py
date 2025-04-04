@@ -1,6 +1,6 @@
 from ultralytics import YOLO
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE" # this is bcs too many people works on this computer
+# os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE" # this is bcs too many people works on this computer
 
 if __name__ == '__main__':
     '''model = YOLO('yolov8n-seg.pt')
@@ -17,10 +17,9 @@ if __name__ == '__main__':
     model = YOLO('yolov8n-seg.pt')
 
     results = model.train(
-        data='C:/Users/oem/Desktop/Kseniia/AtuomaticWeldingPositioning/CNN/weld_data.yaml',
+        data='weld_data.yaml',
         epochs=50,
         batch=8,
         imgsz=640,
-        name='electrode_groove_seg',
-        device=0
+        name='electrode_groove_seg'
     )

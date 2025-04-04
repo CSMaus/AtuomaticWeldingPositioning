@@ -6,3 +6,8 @@
 /CNN/electrode_groove_seg8
 *.png
 *.jpg
+/CNN/dataset_adj
+/CNN/runs
+/CNN/runs
+CNN/.DS_Store
+.DS_Store
