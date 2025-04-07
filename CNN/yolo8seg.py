@@ -3,16 +3,18 @@ import os
 # os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE" # this is bcs too many people works on this computer
 
 if __name__ == '__main__':
-    '''model = YOLO('yolov8n-seg.pt')
-    
+    # model = YOLO('yolo11n-seg.pt')
+    model = YOLO('runs/segment/electrode_groove_seg3/weights/last.pt')
+
     model.train(
         data='weld_data.yaml',
         imgsz=640,
-        epochs=50,
+        epochs=10,
         batch=8,
         name='electrode_groove_seg',
         task='segment'
-    )'''
+    )
+    '''
 
     model = YOLO('yolov8n-seg.pt')
 
@@ -22,4 +24,4 @@ if __name__ == '__main__':
         batch=8,
         imgsz=640,
         name='electrode_groove_seg'
-    )
+    )'''

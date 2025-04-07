@@ -391,3 +391,104 @@ def predict_yolo(curr_frame):
     return labeled
 
 
+
+def predict_yolo_bot_top(curr_frame):
+    results = yolo_model.predict(curr_frame, verbose=False)[0]
+    labeled = curr_frame.copy()
+    names = yolo_model.names
+
+    class_colors = {
+        'Electrode': {'box': (0, 100, 0), 'mask': (0, 255, 0)},
+        'groove_center': {'box': (255, 100, 100), 'mask': (255, 255, 200)}
+    }
+
+    shown_classes = set()
+    cumulative = None
+
+    if results.masks is not None and results.boxes is not None:
+        masks = results.masks.data.cpu().numpy()
+        boxes = results.boxes.xyxy.cpu().numpy()
+        classes = results.boxes.cls.cpu().numpy().astype(int)
+
+        for i, (mask, box, cls_id) in enumerate(zip(masks, boxes, classes)):
+            label = names[cls_id]
+            if label in shown_classes:
+                continue
+            shown_classes.add(label)
+
+            mask_color = class_colors[label]['mask']
+            mask_resized = cv2.resize(mask, (curr_frame.shape[1], curr_frame.shape[0]))
+            mask_uint8 = (mask_resized * 255).astype(np.uint8)
+
+            if label == 'groove_center':
+                x1, y1, x2, y2 = box.astype(int)
+                roi = curr_frame[y1:y2, x1:x2]
+                gray_crop = cv2.cvtColor(roi, cv2.COLOR_RGB2GRAY)
+
+                sobel_x = cv2.Sobel(gray_crop, cv2.CV_64F, 1, 0, ksize=3)
+                sobel_y = cv2.Sobel(gray_crop, cv2.CV_64F, 0, 1, ksize=3)
+                energyyy = np.abs(sobel_x) + np.abs(sobel_y)
+
+                h, w = energyyy.shape
+                cumulative = np.copy(energyyy)
+                backtrack = np.zeros_like(cumulative, dtype=np.int32)
+
+                for row in range(h - 2, -1, -1):
+                    for col in range(w):
+                        left = cumulative[row + 1, col - 1] if col > 0 else float('inf')
+                        down = cumulative[row + 1, col]
+                        right = cumulative[row + 1, col + 1] if col < w - 1 else float('inf')
+
+                        options = [left, down, right]
+                        min_idx = np.argmin(options)
+                        offset = [-1, 0, 1][min_idx]
+
+                        backtrack[row, col] = col + offset
+                        cumulative[row, col] += options[min_idx]
+
+                '''
+                seam = []
+                j = np.argmin(cumulative[0])
+                for i in range(h):
+                    seam.append((j, i))
+                    j = backtrack[i, j]
+                for x, y in seam:
+                    pt = (x1 + x, y1 + y)
+                    cv2.circle(labeled, pt, 1, (0, 0, 255), 3)
+                '''
+                '''
+                seam = find_seam_dijkstra(energy)
+                for x, y in seam:
+                    pt = (x1 + x, y1 + y)
+                    cv2.circle(labeled, pt, 1, (0, 255, 0), 3)
+                '''
+                for row in range(h):
+                    col = np.argmin(cumulative[row])
+                    pt = (x1 + col, y1 + row)
+                    cv2.circle(labeled, pt, 1, (0, 255, 0), 3)
+
+            elif label == 'Electrode':
+                contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(labeled, contours, -1, mask_color, thickness=2)
+
+    shown_classes = set()
+    for box in results.boxes:
+        xyxy = box.xyxy.cpu().numpy().astype(int).flatten()
+        cls_id = int(box.cls.item())
+        label = names[cls_id]
+        if label in shown_classes:
+            continue
+        shown_classes.add(label)
+
+        box_color = class_colors[label]['box']
+        cv2.rectangle(labeled, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), box_color, 2)
+        cv2.putText(labeled, label, (xyxy[0], xyxy[1] - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2)
+
+    if cumulative is not None:
+        norm_cumulative = cv2.normalize(cumulative, None, 0, 255, cv2.NORM_MINMAX)
+        energy_map_display = norm_cumulative.astype(np.uint8)
+        cv2.imshow("Groove Energy Map", energy_map_display)
+
+    return labeled
+
