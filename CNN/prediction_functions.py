@@ -454,6 +454,31 @@ def predict_yolo(curr_frame, electrode_width_mm, is_smooth_points=True, alpha=0.
 
     return labeled
 
+import torch
+import torchvision.transforms as T
+import torchvision.models.segmentation as models
+import time
+
+# deeplab_model = torch.hub.load('pytorch/vision', 'deeplabv3_resnet50', pretrained=True)
+deeplab_model = models.deeplabv3_resnet50(pretrained=True)
+deeplab_model.eval().cpu()
+
+transform = T.Compose([
+    T.ToPILImage(),
+    T.Resize((512, 512)),  # (384, 384)
+    T.ToTensor(),
+    T.Normalize(mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225])
+])
+
+def predict_deeplab(frame, show_fps=False):
+    input_tensor = transform(frame).unsqueeze(0).cpu()  # <-- fixed here
+    start = time.time()
+    with torch.no_grad():
+        _ = deeplab_model(input_tensor)['out']
+    end = time.time()
+    if show_fps:
+        print(f"Inference time: {(end - start)*1000:.1f} ms | FPS: {1 / (end - start):.2f}")
 
 
 def predict_yolo_bot_top(curr_frame):

@@ -39,8 +39,10 @@ while True:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
         display_frame = labeled_frame if labeled_frame is not None else frame
     else:
-        labeled_frame = predict_yolo(frame, electrode_width, False)
-        display_frame = labeled_frame
+        # labeled_frame = predict_yolo(frame, electrode_width, False)
+        # display_frame = labeled_frame
+        predict_deeplab(frame, show_fps=True)
+        display_frame = frame
 
     current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
     cv2.setTrackbarPos("Frame", "Welding Analysis", current_frame)
@@ -54,7 +56,8 @@ while True:
     elif key == ord(" "):
         toggle_pause()
     elif key == ord("p") and frame_paused:
-        labeled_frame = predict_yolo(frame)
+        labeled_frame = predict_yolo(frame, electrode_width, False)
+
 
 
 

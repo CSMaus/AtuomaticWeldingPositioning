@@ -7,9 +7,10 @@ from tqdm import tqdm
 import pandas as pd
 
 
-image_folder = "ds_collect/"
+# image_folder = "ds_collect/"
+image_folder = "datas/ds_imgs/"
 annotations_path = "annotations_Electrode_GroovCenter.xml"
-mask_folder = "masks/"
+mask_folder = "datas/masks/"
 os.makedirs(mask_folder, exist_ok=True)
 
 def parse_points(points_str):
