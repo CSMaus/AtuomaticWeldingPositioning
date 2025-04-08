@@ -303,7 +303,7 @@ def predict_yolo(curr_frame, is_smooth_points=True, alpha=0.98):
 
     class_colors = {
         'Electrode': {'box': (0, 100, 0), 'mask': (0, 255, 0)},
-        'groove_center': {'box': (255, 100, 100), 'mask': (255, 255, 200)}
+        'groove_center': {'box': (200, 100, 100), 'mask': (100, 100, 100)}
     }
 
     shown_classes = set()
@@ -353,7 +353,6 @@ def predict_yolo(curr_frame, is_smooth_points=True, alpha=0.98):
                             bottom_x = (points[-1][0] + x_center) // 2
                             points.append([bottom_x, y2])
 
-
                         # to be not to curve to be close to real shape
                         # curve = np.array(points, dtype=np.int32).reshape((-1, 1, 2))
                         # cv2.polylines(labeled, [curve], isClosed=False, color=mask_color, thickness=3)
@@ -368,18 +367,6 @@ def predict_yolo(curr_frame, is_smooth_points=True, alpha=0.98):
                                 smoothed_points = np.stack([smoothed_x, pts_np[:, 1]], axis=1).astype(np.int32)
                             else:
                                 smoothed_points = pts_np.astype(np.int32)
-
-                            '''temporal_smoothed = []
-                            for x, y in smoothed_points:
-                                if y in smoothed_line_dict:
-                                    prev_x = smoothed_line_dict[y]
-                                    smoothed_x = alpha * prev_x + (1 - alpha) * x
-                                else:
-                                    smoothed_x = x
-                                smoothed_line_dict[y] = smoothed_x
-                                temporal_smoothed.append((int(smoothed_x), y))
-
-                            smoothed_points = np.array(temporal_smoothed, dtype=np.int32)'''
 
                         else:
                             pts_np = np.array(points, dtype=np.int32)
@@ -397,9 +384,36 @@ def predict_yolo(curr_frame, is_smooth_points=True, alpha=0.98):
                         curve = smoothed_points.reshape((-1, 1, 2))
                         cv2.polylines(labeled, [curve], isClosed=False, color=mask_color, thickness=3)
 
+                        # define pointed position:
+                        top_n = 15
+                        if len(smoothed_points) >= top_n:
+                            top_points = smoothed_points[:top_n]
+                        else:
+                            top_points = smoothed_points
+
+                        mean_x = int(np.mean(top_points[:, 0]))
+                        mean_y = y1  # top bbox position
+                        cv2.circle(labeled, (mean_x, mean_y), 5, (255, 250, 250), -1)
+
+
             elif label == 'Electrode':
                 contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 cv2.drawContours(labeled, contours, -1, mask_color, thickness=2)
+
+                # define pointed position:
+                y1_box, y2_box = int(box[1]), int(box[3])
+                mask_crop = mask_uint8[y1_box:y2_box, int(box[0]):int(box[2])]
+
+                rel_y_thresh = mask_crop.shape[0] - 5  # bottom 5 pixels
+                ys, xs = np.where(mask_crop > 10)
+                bottom_idx = np.where(ys >= rel_y_thresh)[0]
+
+                if len(bottom_idx) > 0:
+                    xs_bot = xs[bottom_idx] + int(box[0])
+                    ys_bot = ys[bottom_idx] + y1_box
+                    mean_x = int(np.mean(xs_bot))
+                    mean_y = int(np.mean(ys_bot))
+                    cv2.circle(labeled, (mean_x, mean_y), 5, (0, 0, 255), -1)
 
     shown_classes = set()
     for box in results.boxes:
@@ -412,7 +426,16 @@ def predict_yolo(curr_frame, is_smooth_points=True, alpha=0.98):
 
         box_color = class_colors[label]['box']
         cv2.rectangle(labeled, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), box_color, 2)
-        cv2.putText(labeled, label, (xyxy[0], xyxy[1] - 5),
+        # cv2.putText(labeled, label, (xyxy[0], xyxy[1] - 5),
+        #            cv2.FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2)
+        if label == 'groove_center':
+            label_pos = (xyxy[2], (xyxy[1] + xyxy[3]) // 2)
+            label_txt = "Center"
+        else:
+            label_pos = (xyxy[0], xyxy[1] - 5)
+            label_txt = "Electrode"
+
+        cv2.putText(labeled, label_txt, label_pos,
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2)
 
     return labeled
