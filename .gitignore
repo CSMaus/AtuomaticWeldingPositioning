@@ -12,3 +12,5 @@
 CNN/.DS_Store
 .DS_Store
 /CNN/electrode_groove_seg2
+/CNN/__pycache__
+CNN/yolo11n-seg.pt

@@ -3,9 +3,11 @@ import numpy as np
 from ultralytics import YOLO
 from scipy.signal import savgol_filter
 from sklearn.linear_model import RANSACRegressor
+from helpers import smooth_groove_line
 
 
 yolo_model = YOLO("runs/segment/electrode_groove_seg2/weights/best.pt")
+smoothed_line_dict = {}  # key: y, value: smoothed x
 
 def predict_yoloaa(curr_frame):
     results = yolo_model.predict(curr_frame, conf=0.0, verbose=False)  # force prediction
@@ -294,7 +296,7 @@ def predict_yolo_vert_GC(curr_frame):
 
     return labeled
 
-def predict_yolo(curr_frame):
+def predict_yolo(curr_frame, is_smooth_points=True, alpha=0.98):
     results = yolo_model.predict(curr_frame, verbose=False)[0]
     labeled = curr_frame.copy()
     names = yolo_model.names
@@ -356,19 +358,44 @@ def predict_yolo(curr_frame):
                         # curve = np.array(points, dtype=np.int32).reshape((-1, 1, 2))
                         # cv2.polylines(labeled, [curve], isClosed=False, color=mask_color, thickness=3)
 
-                        desired_window = 43  # odd
-                        poly_order = 3
-                        pts_np = np.array(points)
-                        if len(pts_np) >= 5:
-                            window = min(desired_window, len(pts_np) if len(pts_np) % 2 == 1 else len(pts_np) - 1)
-                            smoothed_x = savgol_filter(pts_np[:, 0], window_length=window, polyorder=poly_order)
-                            smoothed_points = np.stack([smoothed_x, pts_np[:, 1]], axis=1).astype(np.int32)
+                        if not is_smooth_points:
+                            desired_window = 43  # odd
+                            poly_order = 3
+                            pts_np = np.array(points)
+                            if len(pts_np) >= 5:
+                                window = min(desired_window, len(pts_np) if len(pts_np) % 2 == 1 else len(pts_np) - 1)
+                                smoothed_x = savgol_filter(pts_np[:, 0], window_length=window, polyorder=poly_order)
+                                smoothed_points = np.stack([smoothed_x, pts_np[:, 1]], axis=1).astype(np.int32)
+                            else:
+                                smoothed_points = pts_np.astype(np.int32)
+
+                            '''temporal_smoothed = []
+                            for x, y in smoothed_points:
+                                if y in smoothed_line_dict:
+                                    prev_x = smoothed_line_dict[y]
+                                    smoothed_x = alpha * prev_x + (1 - alpha) * x
+                                else:
+                                    smoothed_x = x
+                                smoothed_line_dict[y] = smoothed_x
+                                temporal_smoothed.append((int(smoothed_x), y))
+
+                            smoothed_points = np.array(temporal_smoothed, dtype=np.int32)'''
+
                         else:
-                            smoothed_points = pts_np.astype(np.int32)
+                            pts_np = np.array(points, dtype=np.int32)
+                            temporal_smoothed = []
+                            for x, y in pts_np:
+                                if y in smoothed_line_dict:
+                                    prev_x = smoothed_line_dict[y]
+                                    smoothed_x = alpha * prev_x + (1-alpha) * x
+                                else:
+                                    smoothed_x = x
+                                smoothed_line_dict[y] = smoothed_x
+                                temporal_smoothed.append((int(smoothed_x), y))
+                            smoothed_points = np.array(temporal_smoothed, dtype=np.int32)
 
                         curve = smoothed_points.reshape((-1, 1, 2))
                         cv2.polylines(labeled, [curve], isClosed=False, color=mask_color, thickness=3)
-
 
             elif label == 'Electrode':
                 contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

@@ -66,8 +66,7 @@ def find_seam_dijkstra(energy):
 from collections import deque
 import numpy as np
 
-# Initialize buffer to hold groove center points across last 5 frames
-groove_lines_buffer = deque(maxlen=5)  # stores lists of points for each frame
+groove_lines_buffer = deque(maxlen=5)
 
 def smooth_groove_line(new_line, alpha=0.8):
     """
@@ -77,9 +76,8 @@ def smooth_groove_line(new_line, alpha=0.8):
     groove_lines_buffer.append(np.array(new_line, dtype=np.float32))
 
     if len(groove_lines_buffer) == 1:
-        return new_line  # no smoothing possible yet
+        return new_line
 
-    # Ensure same y-values across all lines
     ref_y = groove_lines_buffer[0][:, 1]
     smoothed_line = np.zeros_like(groove_lines_buffer[0])
 
