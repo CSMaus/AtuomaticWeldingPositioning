@@ -13,6 +13,7 @@ cap = cv2.VideoCapture(this_video_path)
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 frame_paused = False
 frame_pos = 0
+electrode_width = 4.03  # mm
 
 yolo_model = YOLO("runs/segment/electrode_groove_seg2/weights/best.pt")
 # yolo_model = YOLO("runs/electrode_groove_seg2/weights/best.pt")
@@ -38,7 +39,7 @@ while True:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
         display_frame = labeled_frame if labeled_frame is not None else frame
     else:
-        labeled_frame = predict_yolo(frame, False)
+        labeled_frame = predict_yolo(frame, electrode_width, False)
         display_frame = labeled_frame
 
     current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))

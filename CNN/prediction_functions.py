@@ -296,7 +296,7 @@ def predict_yolo_vert_GC(curr_frame):
 
     return labeled
 
-def predict_yolo(curr_frame, is_smooth_points=True, alpha=0.98):
+def predict_yolo(curr_frame, electrode_width_mm, is_smooth_points=True, alpha=0.98):
     results = yolo_model.predict(curr_frame, verbose=False)[0]
     labeled = curr_frame.copy()
     names = yolo_model.names
@@ -394,7 +394,8 @@ def predict_yolo(curr_frame, is_smooth_points=True, alpha=0.98):
                         mean_x = int(np.mean(top_points[:, 0]))
                         mean_y = y1  # top bbox position
                         cv2.circle(labeled, (mean_x, mean_y), 5, (255, 250, 250), -1)
-
+                        # to calculate distance
+                        groove_center = (mean_x, mean_y)
 
             elif label == 'Electrode':
                 contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -414,6 +415,10 @@ def predict_yolo(curr_frame, is_smooth_points=True, alpha=0.98):
                     mean_x = int(np.mean(xs_bot))
                     mean_y = int(np.mean(ys_bot))
                     cv2.circle(labeled, (mean_x, mean_y), 5, (0, 0, 255), -1)
+                    # to calculate distance
+                    electrode_pos = (mean_x, mean_y)
+                    electrode_bbox = box.astype(int)
+
 
     shown_classes = set()
     for box in results.boxes:
@@ -437,6 +442,15 @@ def predict_yolo(curr_frame, is_smooth_points=True, alpha=0.98):
 
         cv2.putText(labeled, label_txt, label_pos,
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2)
+
+    if 'groove_center' in locals() and 'electrode_pos' in locals():
+        pixel_width = electrode_bbox[2] - electrode_bbox[0]
+        mm_per_pixel = electrode_width_mm / pixel_width if pixel_width > 0 else 0
+        dx_px = abs(groove_center[0] - electrode_pos[0])
+        dx_mm = dx_px * mm_per_pixel
+        display_text = f"Distance: {dx_mm:.2f} mm"
+        cv2.putText(labeled, display_text, (50, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (10, 10, 10), 2)
 
     return labeled
 
