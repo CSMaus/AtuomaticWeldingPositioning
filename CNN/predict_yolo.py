@@ -15,7 +15,7 @@ frame_paused = False
 frame_pos = 0
 electrode_width = 4.03  # mm
 
-yolo_model = YOLO("runs/segment/electrode_groove_seg2/weights/best.pt")
+# yolo_model = YOLO("runs/segment/electrode_groove_seg45/weights/best.pt")
 # yolo_model = YOLO("runs/electrode_groove_seg2/weights/best.pt")
 
 
@@ -39,10 +39,11 @@ while True:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
         display_frame = labeled_frame if labeled_frame is not None else frame
     else:
-        # labeled_frame = predict_yolo(frame, electrode_width, False)
-        # display_frame = labeled_frame
-        predict_deeplab(frame, show_fps=True)
-        display_frame = frame
+        # rotate 45 -> predict -> rotate back
+        labeled_frame = predict_yolo45(frame, electrode_width, False)
+        display_frame = labeled_frame
+        # predict_deeplab(frame, show_fps=True)  # test deeplab, but it's too slow
+        # display_frame = frame
 
     current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
     cv2.setTrackbarPos("Frame", "Welding Analysis", current_frame)
