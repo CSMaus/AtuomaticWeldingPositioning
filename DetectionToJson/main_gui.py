@@ -29,6 +29,7 @@ class CameraGUI(QWidget):
         cam_layout = QHBoxLayout()
         self.camera_dropdown = QComboBox()
         self.populate_cameras()
+        self.camera_dropdown.currentIndexChanged.connect(self.change_camera)
         cam_layout.addWidget(QLabel("Camera:"))
         cam_layout.addWidget(self.camera_dropdown)
 
@@ -93,6 +94,16 @@ class CameraGUI(QWidget):
         self.interval_input.editingFinished.connect(self.update_json_timer_interval)
 
         self.setLayout(layout)
+
+    def change_camera(self):
+        if self.timer.isActive():
+            self.timer.stop()
+            if self.cap:
+                self.cap.release()
+
+            cam_idx = self.camera_dropdown.currentData()
+            self.cap = cv2.VideoCapture(cam_idx)
+            self.timer.start(30)
 
     def update_json_timer_interval(self):
         try:
