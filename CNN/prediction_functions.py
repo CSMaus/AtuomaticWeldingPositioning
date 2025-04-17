@@ -6,7 +6,8 @@ from scipy.signal import savgol_filter
 # from helpers import smooth_groove_line
 
 
-yolo_model = YOLO("runs/segment/electrode_groove_seg45/weights/best.pt")
+# yolo_model = YOLO("runs/segment/electrode_groove_seg45/weights/best.pt")
+yolo_model = YOLO("runs/segment/electrode_groove_seg8/weights/best.pt")
 smoothed_line_dict = {}  # key: y, value: smoothed x
 
 def predict_yoloaa(curr_frame):
@@ -296,7 +297,7 @@ def predict_yolo_vert_GC(curr_frame):
 
     return labeled
 
-def predict_yolo(curr_frame, electrode_width_mm, is_smooth_points=True, alpha=0.98):
+def predict_yolo(curr_frame, electrode_width_mm, is_smooth_points=False, alpha=0.98):
     results = yolo_model.predict(curr_frame, verbose=False)[0]
     labeled = curr_frame.copy()
     names = yolo_model.names

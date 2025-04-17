@@ -1,7 +1,7 @@
 # open wideo and save selected frames by pressing "s"
 import os
 import cv2
-from prediction_functions import *
+from prediction_functions import predict_yolo45, predict_yolo
 
 # videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
 videos_path = "D:/ML_DL_AI_stuff/!!DoosanWelding2025/data/"
@@ -24,7 +24,7 @@ def toggle_pause(): global frame_paused; frame_paused = not frame_paused
 
 
 # warm-up with dummy image
-_ = yolo_model.predict(np.zeros((640, 640, 3), dtype=np.uint8), verbose=False)
+# _ = yolo_model.predict(np.zeros((640, 640, 3), dtype=np.uint8), verbose=False)
 cv2.namedWindow("Welding Analysis", cv2.WINDOW_NORMAL)
 cv2.createTrackbar("Frame", "Welding Analysis", 0, total_frames - 1, set_frame)
 
@@ -40,7 +40,8 @@ while True:
         display_frame = labeled_frame if labeled_frame is not None else frame
     else:
         # rotate 45 -> predict -> rotate back
-        labeled_frame = predict_yolo45(frame, electrode_width, False)
+        # labeled_frame = predict_yolo45(frame, electrode_width, False)
+        labeled_frame = predict_yolo(frame, electrode_width, True)
         display_frame = labeled_frame
         # predict_deeplab(frame, show_fps=True)  # test deeplab, but it's too slow
         # display_frame = frame
