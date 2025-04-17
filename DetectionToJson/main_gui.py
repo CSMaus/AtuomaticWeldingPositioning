@@ -101,7 +101,7 @@ class CameraGUI(QWidget):
             if interval > 0:
                 self.json_timer.setInterval(interval)
         except ValueError:
-            pass
+            self.json_timer.setInterval(500)
 
     def populate_cameras(self):
         self.camera_dropdown.clear()
@@ -135,10 +135,15 @@ class CameraGUI(QWidget):
         if not ret:
             return
 
-        angle_text = self.angle_input.text().strip()
-        width_text = self.width_input.text().strip()
-        angle = float(angle_text) if angle_text else 0.0
-        width = float(width_text) if width_text else 0.0
+        try:
+            angle = float(self.angle_input.text().strip())
+        except ValueError:
+            angle = 0.0
+
+        try:
+            width = float(self.width_input.text().strip())
+        except ValueError:
+            width = 0.0
 
         model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(Best) YOLOv11-rotated45" else get_masks_points_distance
         prediction = model_func(frame, width, self.current_model, angle)
