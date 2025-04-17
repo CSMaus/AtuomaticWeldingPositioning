@@ -3,11 +3,11 @@ import os
 import cv2
 from prediction_functions import *
 
-videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
-# videos_path = "D:/ML_DL_AI_stuff/!!DoosanWelding2025/data/"
+# videos_path = "/Users/kseni/Downloads/kakao/Robot REC/"
+videos_path = "D:/ML_DL_AI_stuff/!!DoosanWelding2025/data/"
 # this_video_path = os.path.join(videos_path, os.listdir(videos_path)[11])
 # "rb6.360mm & 30d.mp4")  # "rb_test7.mp4")
-video_name = "rb_test8"
+video_name = "rb_test6"
 this_video_path = os.path.join(videos_path, f"{video_name}.mp4")
 cap = cv2.VideoCapture(this_video_path)
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))

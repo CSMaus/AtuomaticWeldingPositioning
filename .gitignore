@@ -15,3 +15,6 @@ CNN/.DS_Store
 /CNN/__pycache__
 CNN/yolo11n-seg.pt
 /CNN/dataset_45
+/DetectionToJson/__pycache__
+/DetectionToJson/electrode_groove_seg
+/DetectionToJson/electrode_groove_seg45

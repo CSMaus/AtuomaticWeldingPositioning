@@ -2,8 +2,8 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 from scipy.signal import savgol_filter
-from sklearn.linear_model import RANSACRegressor
-from helpers import smooth_groove_line
+# from sklearn.linear_model import RANSACRegressor
+# from helpers import smooth_groove_line
 
 
 yolo_model = YOLO("runs/segment/electrode_groove_seg45/weights/best.pt")
@@ -560,16 +560,17 @@ def predict_yolo45(curr_frame, electrode_width_mm, is_smooth_points=True, alpha=
                                 temporal_smoothed.append((int(smoothed_x), y))
                             smoothed_points = np.array(temporal_smoothed, dtype=np.int32)
 
-                        # Rotate curve back and draw
+                        # rotate back and draw
                         unrotated_curve = apply_inverse_transform(smoothed_points, inv_matrix).reshape((-1, 1, 2))
                         cv2.polylines(labeled, [unrotated_curve], isClosed=False, color=mask_color, thickness=3)
 
                         # Point for groove center
                         top_n = 55
                         top_points = smoothed_points[:top_n] if len(smoothed_points) >= top_n else smoothed_points
-                        mean_x = int(np.mean(top_points[:, 0]))
-                        median_x = int(np.median(unrotated_curve[:, 0]))
-                        mean_y = y1  #####################################  mean_x
+                        mean_x = int(np.mean(unrotated_curve[:, 0, 0]))
+                        median_x = int(np.median(unrotated_curve[:, 0, 0]))
+                        # mean_y = y1  #####################################  mean_x
+                        mean_y = int(np.mean(unrotated_curve[:, 0, 1]))
                         # unrotated_point = apply_inverse_transform([(median_x, mean_y)], inv_matrix)[0]
                         groove_center = (median_x, mean_y)  # tuple(unrotated_point)
                         cv2.circle(labeled, groove_center, 5, groove_c_point_color, -1)
@@ -615,8 +616,8 @@ import torchvision.models.segmentation as models
 import time
 
 # deeplab_model = torch.hub.load('pytorch/vision', 'deeplabv3_resnet50', pretrained=True)
-deeplab_model = models.deeplabv3_resnet50(pretrained=True)
-deeplab_model.eval().cpu()
+# deeplab_model = models.deeplabv3_resnet50(pretrained=True)
+# deeplab_model.eval().cpu()
 
 transform = T.Compose([
     T.ToPILImage(),
@@ -629,8 +630,8 @@ transform = T.Compose([
 def predict_deeplab(frame, show_fps=False):
     input_tensor = transform(frame).unsqueeze(0).cpu()  # <-- fixed here
     start = time.time()
-    with torch.no_grad():
-        _ = deeplab_model(input_tensor)['out']
+    # with torch.no_grad():
+    #     _ = deeplab_model(input_tensor)['out']
     end = time.time()
     if show_fps:
         print(f"Inference time: {(end - start)*1000:.1f} ms | FPS: {1 / (end - start):.2f}")
