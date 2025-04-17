@@ -7,7 +7,7 @@ from PyQt6.QtGui import QImage, QPixmap
 import cv2
 import numpy as np
 from ultralytics import YOLO
-from helpers import get_masks_points_distance, get_masks_points_distance45, draw_masks_points_distance
+from helpers import get_masks_points_distance, get_masks_points_distance45, draw_masks_points_distance, write_json_file
 
 class CameraGUI(QWidget):
     def __init__(self):
@@ -71,7 +71,37 @@ class CameraGUI(QWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
 
+        record_layout = QHBoxLayout()
+
+        self.json_name_input = QLineEdit("predictions")
+        record_layout.addWidget(QLabel("JSON Filename:"))
+        record_layout.addWidget(self.json_name_input)
+
+        self.record_checkbox = QCheckBox("Record JSON")
+        record_layout.addWidget(self.record_checkbox)
+
+        layout.addLayout(record_layout)
+
+        self.json_timer = QTimer()
+        self.json_timer.timeout.connect(self.save_json_periodically)
+        self.json_timer.start(500)
+        self.latest_prediction = None
+        self.interval_input = QLineEdit("500")
+        record_layout.addWidget(QLabel("Save every (ms):"))
+        record_layout.addWidget(self.interval_input)
+
+        self.interval_input.editingFinished.connect(self.update_json_timer_interval)
+
         self.setLayout(layout)
+
+    def update_json_timer_interval(self):
+        try:
+            interval_text = self.interval_input.text().strip()
+            interval = int(interval_text) if interval_text else 500
+            if interval > 0:
+                self.json_timer.setInterval(interval)
+        except ValueError:
+            pass
 
     def populate_cameras(self):
         self.camera_dropdown.clear()
@@ -105,8 +135,10 @@ class CameraGUI(QWidget):
         if not ret:
             return
 
-        angle = float(self.angle_input.text())
-        width = float(self.width_input.text())
+        angle_text = self.angle_input.text().strip()
+        width_text = self.width_input.text().strip()
+        angle = float(angle_text) if angle_text else 0.0
+        width = float(width_text) if width_text else 0.0
 
         model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(Best) YOLOv11-rotated45" else get_masks_points_distance
         prediction = model_func(frame, width, self.current_model, angle)
@@ -116,17 +148,28 @@ class CameraGUI(QWidget):
                                                    is_draw_masks=self.mask_checkbox.isChecked(),
                                                    is_draw_distance=self.distance_checkbox.isChecked())
 
+
         rgb_image = cv2.cvtColor(labeled_frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_image.shape
         bytes_per_line = ch * w
         convert_to_Qt_format = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+
         self.video_label.setPixmap(QPixmap.fromImage(convert_to_Qt_format).scaled(self.video_label.width(), self.video_label.height()))
+
+        if self.record_checkbox.isChecked():
+            self.latest_prediction = prediction
+
+    def save_json_periodically(self):
+        if self.record_checkbox.isChecked() and self.latest_prediction is not None:
+            name_text = self.json_name_input.text().strip()
+            json_file_name = name_text if name_text else "predictions"
+            write_json_file(self.latest_prediction, json_file_name)
 
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = CameraGUI()
-    window.resize(800, 600)
+    window.resize(800, 800)
     window.show()
     sys.exit(app.exec())
 

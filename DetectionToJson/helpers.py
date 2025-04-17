@@ -1,14 +1,11 @@
 import cv2
 import numpy as np
-from scipy.signal import savgol_filter
-# from ultralytics import YOLO
+import json
+import os
+import builtins
 
 
 
-
-# TODO: make description for each function
-# TODO: fix the prediction function to return polylines
-# TODO: make separate function to display predictions
 def apply_inverse_transform(points, inv_matrix):
     points_np = np.array(points, dtype=np.float32).reshape(-1, 1, 2)
     return cv2.transform(points_np, inv_matrix).astype(np.int32).reshape(-1, 2)
@@ -246,6 +243,35 @@ def get_masks_points_distance(curr_frame,
         'bboxes': bboxes
     }
 
+def write_json_file(json_data, json_file_name):
+    '''data = json_data.copy()
+    for key, value in data.items():
+        if isinstance(value, np.ndarray):
+            data[key] = value.tolist()'''
+
+    def safe_convert(obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.integer, np.floating)):
+            return obj.item()
+        elif isinstance(obj, tuple):
+            return [safe_convert(x) for x in obj]
+        elif isinstance(obj, list):
+            return [safe_convert(x) for x in obj]
+        elif isinstance(obj, dict):
+            return {k: safe_convert(v) for k, v in obj.items()}
+        elif isinstance(obj, (int, float, str, bool)) or obj is None:
+            return obj
+        else:
+            # fallback to string if unknown type (prevent freezing)
+            return str(obj)
+
+    data = safe_convert(json_data)
+
+    final_filename = f"{json_file_name}.json"
+    with open(final_filename, "w") as json_file:
+        json.dump(data, json_file, indent=4)
+
 
 def draw_masks_points_distance(curr_frame, prediction_output, is_draw_masks=True, is_draw_distance=True):
     labeled = curr_frame.copy()
@@ -301,6 +327,7 @@ def draw_masks_points_distance(curr_frame, prediction_output, is_draw_masks=True
     return labeled
 
 
-
+        # json_file.flush()
+        # os.fsync(json_file.fileno())
 
 
