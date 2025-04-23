@@ -51,12 +51,20 @@ def get_masks_points_distance45(curr_frame,
         :param alpha: if is_smooth_points is True, the alpha value for smoothing based on previous positions
         :return: segmentation masks and points of the groove center and electrode
         """
+    # TODO: rotate the curr_frame based on camera_rotation_angle to make it normal. i e if camera rotation angle is 0,
+    # then it should be as it is, otherwise we have to rotate it to the needed angle
+    # curr_frame =
+    # and after rotating original frame we can adjust its 45 degree rotation
 
-    rotated_frame, rot_matrix, inv_matrix, new_w, new_h = rotate_image_with_inverse(curr_frame, 45)
+    # rotated_frame, rot_matrix, inv_matrix, new_w, new_h = rotate_image_with_inverse(curr_frame, 45)
+    pre_rotated_frame, pre_rot_matrix, pre_inv_matrix, pre_w, pre_h = rotate_image_with_inverse(curr_frame, camera_rotation_angle)
+    rotated_frame, rot_matrix, inv_matrix, new_w, new_h = rotate_image_with_inverse(pre_rotated_frame, 45)
+
     results = yolo_model.predict(rotated_frame, verbose=False)[0]
 
     groove_center_points, electrode_contours, groove_center_point, electrode_point, electrode_bbox = None, None, None, None, None
     smoothed_line_dict = {}
+    pixel_width_mask = 0
 
     if results.masks is not None and results.boxes is not None:
         masks = results.masks.data.cpu().numpy()
@@ -100,18 +108,27 @@ def get_masks_points_distance45(curr_frame,
                             temporal_smoothed.append((int(smoothed_x), y))
                         smoothed_points = np.array(temporal_smoothed, dtype=np.int32)
 
+
                     groove_center_points = apply_inverse_transform(smoothed_points, inv_matrix).reshape((-1, 1, 2))
                     median_x = int(np.median(groove_center_points[:, 0, 0]))
                     mean_y = int(np.mean(groove_center_points[:, 0, 1]))
                     groove_center_point = (median_x, mean_y)
 
+                    # rotate all back to display contours correctly after rotating frame to camera angle
+                    groove_center_points = apply_inverse_transform(groove_center_points, pre_inv_matrix).reshape((-1, 1, 2))
+
             elif label == 'Electrode':
                 contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
                 electrode_contours = [apply_inverse_transform(cnt[:, 0, :], inv_matrix).reshape(-1, 1, 2) for cnt in contours]
 
                 y1_box, y2_box = int(box[1]), int(box[3])
                 mask_crop = mask_uint8[y1_box:y2_box, int(box[0]):int(box[2])]
                 ys, xs = np.where(mask_crop > 10)
+                if len(ys) == 0 or len(xs) == 0:
+                    print("Electrode mask is empty, skipping this contour.")
+                    continue
+
                 rel_y_thresh = mask_crop.shape[0] - 5
                 bottom_idx = np.where(ys >= rel_y_thresh)[0]
 
@@ -123,13 +140,45 @@ def get_masks_points_distance45(curr_frame,
                     electrode_point = tuple(apply_inverse_transform([(mean_x, mean_y)], inv_matrix)[0])
                     electrode_bbox = box.astype(int)
 
+                # pixel_width = electrode_bbox[2] - electrode_bbox[0], which is okay if no rotation
+                if len(ys) > 0:
+                    top_y = np.min(ys)
+                    bottom_y = np.max(ys)
+                    top_half_y = top_y + (bottom_y - top_y) // 2
+
+                    widths = []
+                    for y in range(top_y + 3, top_half_y):
+                        x_this_y = xs[ys == y]
+                        if len(x_this_y) > 1:
+                            width = x_this_y.max() - x_this_y.min()
+                            widths.append(width)
+                    if len(widths) > 0:
+                        pixel_width_mask = np.median(widths)
+                    else:
+                        pixel_width_mask = None
+                else:
+                    pixel_width_mask = None
+
+                # rotate all back to display contours correctly after rotating frame to camera angle
+                electrode_contours = [apply_inverse_transform(cnt[:, 0, :], pre_inv_matrix).reshape(-1, 1, 2) for cnt in electrode_contours]
+
     distance_mm = None
     if groove_center_point and electrode_point and electrode_bbox is not None:
-        pixel_width = electrode_bbox[2] - electrode_bbox[0]
-        mm_per_pixel = electrode_width_mm / pixel_width if pixel_width > 0 else 0
+        # pixel_width = electrode_bbox[2] - electrode_bbox[0]
+        # mm_per_pixel = electrode_width_mm / pixel_width if pixel_width > 0 else 0
+        if pixel_width_mask is not None and pixel_width_mask !=0:
+            mm_per_pixel = electrode_width_mm / pixel_width_mask
+        else:
+            mm_per_pixel = 0
+
         dx_px = abs(groove_center_point[0] - electrode_point[0])
+        # rotate them back only after calculating distance
+        groove_center_point = tuple(apply_inverse_transform([groove_center_point], pre_inv_matrix)[0])
+        electrode_point = tuple(apply_inverse_transform([electrode_point], pre_inv_matrix)[0])
         raw_dx_mm = dx_px * mm_per_pixel
-        distance_mm = raw_dx_mm * np.cos(np.radians(camera_rotation_angle))
+        distance_mm = raw_dx_mm * np.cos(np.radians(camera_rotation_angle)) # TODO: need to test. I'm not sure about it
+
+
 
     return {
         'groove_center_points': groove_center_points,
@@ -162,12 +211,17 @@ def get_masks_points_distance(curr_frame,
         :param alpha: if is_smooth_points is True, the alpha value for smoothing based on previous positions
         :return: segmentation masks and points of the groove center and electrode
         """
+    # TODO: rotate the curr_frame based on camera_rotation_angle to make it normal. i e if camera rotation angle is 0,
+    # then it should be as it is, otherwise we have to rotate it to the needed angle
+    # curr_frame =
+    curr_frame, rot_matrix, inv_matrix, new_w, new_h = rotate_image_with_inverse(curr_frame, camera_rotation_angle)
 
     results = yolo_model.predict(curr_frame, verbose=False)[0]
 
     groove_center_points, electrode_contours, groove_center_point, electrode_point, electrode_bbox = None, None, None, None, None
     bboxes = []
     smoothed_line_dict = {}
+    pixel_width_mask = 0
 
     if results.masks is not None and results.boxes is not None:
         masks = results.masks.data.cpu().numpy()
@@ -211,6 +265,7 @@ def get_masks_points_distance(curr_frame,
                         mean_y = int(np.mean(groove_center_points[:, 0, 1]))
                         groove_center_point = (mean_x, mean_y)
 
+
             elif label == 'Electrode':
                 contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 electrode_contours = contours
@@ -226,6 +281,9 @@ def get_masks_points_distance(curr_frame,
                     electrode_point = (mean_x, mean_y)
                     electrode_bbox = bbox
 
+
+
+
     distance_mm = None
     if groove_center_point and electrode_point and electrode_bbox is not None:
         pixel_width = electrode_bbox[2] - electrode_bbox[0]
@@ -233,6 +291,27 @@ def get_masks_points_distance(curr_frame,
         dx_px = abs(groove_center_point[0] - electrode_point[0])
         raw_dx_mm = dx_px * mm_per_pixel
         distance_mm = raw_dx_mm * np.cos(np.radians(camera_rotation_angle))
+
+    # rotate all back to display contours correctly after rotating frame to camera angle
+    if groove_center_points is not None:
+        groove_center_points = apply_inverse_transform(groove_center_points, inv_matrix).reshape((-1, 1, 2))
+    if electrode_contours is not None:
+        electrode_contours = [apply_inverse_transform(cnt[:, 0, :], inv_matrix).reshape(-1, 1, 2) for cnt in electrode_contours]
+    if electrode_point is not None:
+        electrode_point = tuple(apply_inverse_transform([electrode_point], inv_matrix)[0])
+    if groove_center_point is not None:
+        groove_center_point = tuple(apply_inverse_transform([groove_center_point], inv_matrix)[0])
+
+    '''if bboxes is not None:
+        for bbox in bboxes:
+            print('Class:', bbox['label'], 'Original:', bbox['bbox'])
+            x1, y1, x2, y2 = bbox['bbox']
+            pt1 = apply_inverse_transform([(x1, y1)], inv_matrix)[0]
+            pt2 = apply_inverse_transform([(x2, y2)], inv_matrix)[0]
+            x1n, y1n = pt1
+            x2n, y2n = pt2
+            bbox['bbox'] = [min(x1n, x2n), min(y1n, y2n), max(x1n, x2n), max(y1n, y2n)]
+            print('Transformed:', [min(pt1[0], pt2[0]), min(pt1[1], pt2[1]), max(pt1[0], pt2[0]), max(pt1[1], pt2[1])])'''
 
     return {
         'groove_center_points': groove_center_points,
@@ -273,7 +352,10 @@ def write_json_file(json_data, json_file_name):
         json.dump(data, json_file, indent=4)
 
 
-def draw_masks_points_distance(curr_frame, prediction_output, is_draw_masks=True, is_draw_distance=True):
+def draw_masks_points_distance(curr_frame, prediction_output, camera_rotation_angle=0, is_draw_masks=True, is_draw_distance=True):
+    # TODO: rotate the curr_frame based on camera_rotation_angle to make it normal. i e if camera rotation angle is 0,
+    # then it should be as it is, otherwise we have to rotate it to the needed angle
+    # labeled is rotated curr frame
     labeled = curr_frame.copy()
 
     class_colors = {
@@ -298,7 +380,7 @@ def draw_masks_points_distance(curr_frame, prediction_output, is_draw_masks=True
         if prediction_output['electrode_point']:
             cv2.circle(labeled, prediction_output['electrode_point'], 5, electrode_point_color, -1)
 
-        if prediction_output['bboxes'] is not None:
+        if prediction_output['bboxes'] is not None and camera_rotation_angle == 0:
             colors = {'Electrode': (0, 100, 0), 'groove_center': (200, 100, 100)}
             drawn_labels = set()
             for bbox_info in prediction_output['bboxes']:
@@ -318,6 +400,8 @@ def draw_masks_points_distance(curr_frame, prediction_output, is_draw_masks=True
                 cv2.rectangle(labeled, (x1, y1), (x2, y2), colors.get(label, (0, 200, 0)), 2)
                 cv2.putText(labeled, label_txt, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
                             0.6, colors.get(label, (200, 150, 150)), 2)
+
+    # TODO: and rotate labeled frame back based on camera_rotation_angle
 
     if is_draw_distance:
         if prediction_output['distance_mm'] is not None:

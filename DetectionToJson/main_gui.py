@@ -160,7 +160,7 @@ class CameraGUI(QWidget):
         prediction = model_func(frame, width, self.current_model, angle)
 
 
-        labeled_frame = draw_masks_points_distance(frame, prediction,
+        labeled_frame = draw_masks_points_distance(frame, prediction, angle,
                                                    is_draw_masks=self.mask_checkbox.isChecked(),
                                                    is_draw_distance=self.distance_checkbox.isChecked())
 
