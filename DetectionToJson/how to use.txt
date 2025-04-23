@@ -1,0 +1,12 @@
+1. Make sure the Python3.9._ is installed. You can check it in Control Panel -> Programms and Features (제어판 → 프로그램 및 기능)
+1.1 if the Python is not installed, you can download it and install from official web site (I use 3.9.7 https://www.python.org/downloads/release/python-397/)
+
+NOTE: if other version of python is installed you can try to install requirements and run the programm before reinstalling python.
+
+
+2. To install all required libraries open command prompt in this folder and run command "pip install -r requirements.txt"
+
+3. To run the programm, you cam run command "python main_gui.py"
+Make shure that the camera is connected before running programm.
+
+4. To stop programm you can close the window or press "Crtl + C" in command window
