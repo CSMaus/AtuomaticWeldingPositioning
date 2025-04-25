@@ -139,13 +139,21 @@ class CameraGUI(QWidget):
             grab = self.basler_cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
             if grab.GrabSucceeded():
                 img = grab.Array
-                frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2BGR)
+
+                if img.ndim == 3 and img.shape[2] == 2:
+                    height, width, _ = img.shape
+                    img_uint16 = img.view(np.uint16).reshape(height, width)
+                    img_uint8 = (img_uint16 & 0xFF).astype(np.uint8)  # gray image
+                    frame = cv2.cvtColor(img_uint8, cv2.COLOR_BAYER_BG2BGR)
+
+                elif img.ndim == 2:
+                    frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2BGR)
+                elif img.ndim == 3 and img.shape[2] == 3:
+                    frame = img
+                else:
+                    raise ValueError(f"Unsupported image shape {img.shape}")
                 grab.Release()
             else:
-                return
-        elif not self.is_basler and self.cap is not None:
-            ret, frame = self.cap.read()
-            if not ret:
                 return
         else:
             return
