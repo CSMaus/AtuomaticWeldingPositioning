@@ -143,6 +143,12 @@ class CameraGUI(QWidget):
                 if img.ndim == 3 and img.shape[2] == 2:
                     height, width, _ = img.shape
                     img_uint16 = img.view(np.uint16).reshape(height, width)
+                    # todo: fix the problem with conversion
+                    # the use of COLOR_YUV2BGR_YUY2 should work but destroys the image
+                    # the use of COLOR_YUV2BGR_YUY2 gives error, but should give desired
+                    # result for other versions of camera
+                    # maybe drivers problem?
+                    # todo: check drivers problem & overhiting
                     img_uint8 = (img_uint16 & 0xFF).astype(np.uint8)  # gray image
                     frame = cv2.cvtColor(img_uint8, cv2.COLOR_BAYER_BG2BGR)
 
