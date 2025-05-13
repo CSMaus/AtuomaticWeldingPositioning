@@ -220,6 +220,8 @@ def get_masks_points_distance(curr_frame,
 
     groove_center_points, electrode_contours, groove_center_point, electrode_point, electrode_bbox = None, None, None, None, None
     bboxes = []
+    groove_masks = []
+    groove_bboxes = []
     smoothed_line_dict = {}
     pixel_width_mask = 0
 
@@ -265,8 +267,7 @@ def get_masks_points_distance(curr_frame,
                         mean_y = int(np.mean(groove_center_points[:, 0, 1]))
                         groove_center_point = (mean_x, mean_y)
 
-
-            elif label == 'Electrode':
+            elif label == 'Electrode' or label == 'W-Rod':
                 contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 electrode_contours = contours
 
@@ -280,6 +281,11 @@ def get_masks_points_distance(curr_frame,
                     mean_y = int(np.mean(ys[bottom_idx]) + y1_box)
                     electrode_point = (mean_x, mean_y)
                     electrode_bbox = bbox
+            else:
+                bbox = box.astype(int)
+                x1, y1, x2, y2 = bbox
+                groove_bboxes.append(bbox)
+                groove_masks.append(mask_uint8[y1:y2, x1:x2].copy())
 
 
 
@@ -302,21 +308,12 @@ def get_masks_points_distance(curr_frame,
     if groove_center_point is not None:
         groove_center_point = tuple(apply_inverse_transform([groove_center_point], inv_matrix)[0])
 
-    '''if bboxes is not None:
-        for bbox in bboxes:
-            print('Class:', bbox['label'], 'Original:', bbox['bbox'])
-            x1, y1, x2, y2 = bbox['bbox']
-            pt1 = apply_inverse_transform([(x1, y1)], inv_matrix)[0]
-            pt2 = apply_inverse_transform([(x2, y2)], inv_matrix)[0]
-            x1n, y1n = pt1
-            x2n, y2n = pt2
-            bbox['bbox'] = [min(x1n, x2n), min(y1n, y2n), max(x1n, x2n), max(y1n, y2n)]
-            print('Transformed:', [min(pt1[0], pt2[0]), min(pt1[1], pt2[1]), max(pt1[0], pt2[0]), max(pt1[1], pt2[1])])'''
-
     return {
         'groove_center_points': groove_center_points,
         'electrode_contours': electrode_contours,
         'groove_center_point': groove_center_point,
+        'groove_bboxes': groove_bboxes,
+        'groove_masks': groove_masks,
         'electrode_point': electrode_point,
         'distance_mm': distance_mm,
         'bboxes': bboxes
@@ -352,15 +349,25 @@ def write_json_file(json_data, json_file_name):
         json.dump(data, json_file, indent=4)
 
 
-def draw_masks_points_distance(curr_frame, prediction_output, camera_rotation_angle=0, is_draw_masks=True, is_draw_distance=True):
+def draw_masks_points_distance(curr_frame, prediction_output,
+                               camera_rotation_angle=0, is_draw_masks=True,
+                               is_draw_distance=True,
+                               isuseNewLabels=True):
     # TODO: rotate the curr_frame based on camera_rotation_angle to make it normal. i e if camera rotation angle is 0,
     # then it should be as it is, otherwise we have to rotate it to the needed angle
     # labeled is rotated curr frame
     labeled = curr_frame.copy()
 
+    wrod_lbl = "W-Rod"
+    groove_lbl = "Groove"
+    if not isuseNewLabels:
+        wrod_lbl = "W-rod"
+        groove_lbl = "Center"
+
     class_colors = {
         'Electrode': {'mask': (0, 255, 0)},
-        'groove_center': {'mask': (230, 230, 230)}
+        'groove_center': {'mask': (230, 230, 230)},
+        'Groove': {'mask': (0, 230, 230)}
     }
     electrode_point_color = (0, 0, 255)
     groove_c_point_color = (50, 50, 255)
@@ -373,6 +380,14 @@ def draw_masks_points_distance(curr_frame, prediction_output, camera_rotation_an
         if prediction_output['electrode_contours'] is not None:
             cv2.drawContours(labeled, prediction_output['electrode_contours'],
                              -1, class_colors['Electrode']['mask'], thickness=2)
+
+        if prediction_output['groove_masks'] is not None:
+            for mask, bbox in zip(prediction_output['groove_masks'], prediction_output['groove_bboxes']):
+                x1, y1, x2, y2 = bbox
+                labeled[y1:y2, x1:x2][mask > 10] = class_colors['Groove']['mask']
+                cv2.rectangle(labeled, (x1, y1), (x2, y2), class_colors['Groove']['mask'], thickness=2)
+
+
         # if is_draw_points:
         if prediction_output['groove_center_point']:
             cv2.circle(labeled, prediction_output['groove_center_point'], 5, groove_c_point_color, -1)
@@ -391,22 +406,22 @@ def draw_masks_points_distance(curr_frame, prediction_output, camera_rotation_an
                 drawn_labels.add(label)
                 x1, y1, x2, y2 = bbox_info['bbox']
 
-                if label == 'groove_center':
+                if label == 'groove_center' or label == 'Groove':
                     label_pos = (x2, (y1 + y2) // 2)
-                    label_txt = "Center"
+                    label_txt = groove_lbl
                 else:
                     label_pos = (x1, y1 - 5)
-                    label_txt = "Electrode"
+                    label_txt = wrod_lbl
                 cv2.rectangle(labeled, (x1, y1), (x2, y2), colors.get(label, (0, 200, 0)), 2)
                 cv2.putText(labeled, label_txt, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
                             0.6, colors.get(label, (200, 150, 150)), 2)
 
     # TODO: and rotate labeled frame back based on camera_rotation_angle
 
-    if is_draw_distance:
-        if prediction_output['distance_mm'] is not None:
-            cv2.putText(labeled, f"Distance: {prediction_output['distance_mm']:.2f} mm", (50, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (10, 10, 10), 2)
+    # if is_draw_distance:
+    #     if prediction_output['distance_mm'] is not None:
+    #         cv2.putText(labeled, f"Distance: {prediction_output['distance_mm']:.2f} mm", (50, 50),
+    #                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (10, 10, 10), 2)
 
     return labeled
 
