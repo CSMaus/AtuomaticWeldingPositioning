@@ -18,3 +18,7 @@ CNN/yolo11n-seg.pt
 /DetectionToJson/__pycache__
 /DetectionToJson/electrode_groove_seg
 /DetectionToJson/electrode_groove_seg45
+*.txt
+/GrooveRod_detection/RetrainYOLO/runs
+/GrooveRod_detection/RetrainYOLO/dataset_labeling/labels
+*.pt
