@@ -1,3 +1,5 @@
+import sys
+
 import cv2
 import os
 from pathlib import Path
