@@ -27,7 +27,7 @@ class CameraGUI(QWidget):
         cam_layout.addWidget(QLabel("Camera:"))
         cam_layout.addWidget(self.camera_dropdown)
         self.model_selector = QComboBox()
-        self.model_selector.addItems(["(Best) YOLOv11-rotated45", "YOLOv11 - without rotation"])
+        self.model_selector.addItems(["(new) W-Rod, Groove", "(old) YOLOv11-rotated45 - best", "(old) YOLOv11 - without rotation"])
         self.model_selector.currentIndexChanged.connect(self.load_selected_model)
         self.load_selected_model()
         cam_layout.addWidget(QLabel("Model:"))
@@ -128,8 +128,10 @@ class CameraGUI(QWidget):
 
     def load_selected_model(self):
         model_name = self.model_selector.currentText()
-        if model_name == "(Best) YOLOv11-rotated45":
+        if model_name == "(old) YOLOv11-rotated45 - best":
             self.current_model = YOLO("electrode_groove_seg45/weights/best.pt")
+        elif model_name == "(new) W-Rod, Groove":
+            self.current_model = YOLO("yolo11s_labeling3/weights/best.pt")
         else:
             self.current_model = YOLO("electrode_groove_seg/weights/best.pt")
         self.current_model.predict(np.zeros((640, 640, 3), dtype=np.uint8), verbose=False)
