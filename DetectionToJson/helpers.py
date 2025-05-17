@@ -3,7 +3,9 @@ import numpy as np
 import json
 import os
 import builtins
-
+# TODO: display L-groove and R-Groove
+# TODO: display groove masks as contours
+# TODO: calculate the distance between groove and rod
 
 
 def apply_inverse_transform(points, inv_matrix):
@@ -288,7 +290,11 @@ def get_masks_points_distance(curr_frame,
                 groove_masks.append(mask_uint8[y1:y2, x1:x2].copy())
 
 
-
+    groove_relative_label = None
+    if len(groove_bboxes) > 0 and electrode_bbox is not None:
+        groove_x = (groove_bboxes[0][0] + groove_bboxes[0][2]) // 2
+        wrod_x = (electrode_bbox[0] + electrode_bbox[2]) // 2
+        groove_relative_label = "L-Gro" if groove_x < wrod_x else "R-Gro"
 
     distance_mm = None
     if groove_center_point and electrode_point and electrode_bbox is not None:
@@ -313,43 +319,16 @@ def get_masks_points_distance(curr_frame,
         'electrode_contours': electrode_contours,
         'groove_center_point': groove_center_point,
         'groove_bboxes': groove_bboxes,
+        'groove_relative_label': groove_relative_label,
         'groove_masks': groove_masks,
         'electrode_point': electrode_point,
         'distance_mm': distance_mm,
         'bboxes': bboxes
     }
 
-def write_json_file(json_data, json_file_name):
-    '''data = json_data.copy()
-    for key, value in data.items():
-        if isinstance(value, np.ndarray):
-            data[key] = value.tolist()'''
-
-    def safe_convert(obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, (np.integer, np.floating)):
-            return obj.item()
-        elif isinstance(obj, tuple):
-            return [safe_convert(x) for x in obj]
-        elif isinstance(obj, list):
-            return [safe_convert(x) for x in obj]
-        elif isinstance(obj, dict):
-            return {k: safe_convert(v) for k, v in obj.items()}
-        elif isinstance(obj, (int, float, str, bool)) or obj is None:
-            return obj
-        else:
-            # fallback to string if unknown type (prevent freezing)
-            return str(obj)
-
-    data = safe_convert(json_data)
-
-    final_filename = f"{json_file_name}.json"
-    with open(final_filename, "w") as json_file:
-        json.dump(data, json_file, indent=4)
 
 
-def draw_masks_points_distance(curr_frame, prediction_output,
+def draw_masks_points_distance_0(curr_frame, prediction_output,
                                camera_rotation_angle=0, is_draw_masks=True,
                                is_draw_distance=True,
                                isuseNewLabels=True):
@@ -400,32 +379,123 @@ def draw_masks_points_distance(curr_frame, prediction_output,
             drawn_labels = set()
             for bbox_info in prediction_output['bboxes']:
                 label = bbox_info['label']
-                if label in drawn_labels:
-                    continue
+                if label == 'W-Rod':
+                    if label in drawn_labels:
+                        continue
 
-                drawn_labels.add(label)
-                x1, y1, x2, y2 = bbox_info['bbox']
+                    drawn_labels.add(label)
+                    x1, y1, x2, y2 = bbox_info['bbox']
 
+                    if label == 'groove_center' or label == 'Groove':
+                        label_pos = (x2, (y1 + y2) // 2)
+                        label_txt = groove_lbl
+                    else:
+                        label_pos = (x1, y1 - 5)
+                        label_txt = wrod_lbl
+                    cv2.rectangle(labeled, (x1, y1), (x2, y2), colors.get(label, (0, 200, 0)), 2)
+                    cv2.putText(labeled, label_txt, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
+                                0.6, colors.get(label, (200, 150, 150)), 2)
+    return labeled
+
+def draw_masks_points_distance(curr_frame, prediction_output,
+                               camera_rotation_angle=0,
+                               is_draw_masks=True,
+                               is_draw_distance=True,
+                               is_draw_groove_masks=True,
+                               isuseNewLabels=True):
+    labeled = curr_frame.copy()
+
+    wrod_lbl = "W-Rod"
+    groove_lbl = prediction_output.get('groove_relative_label', "Groove")
+    if not isuseNewLabels:
+        wrod_lbl = "W-rod"
+        groove_lbl = "Center"
+
+    class_colors = {
+        'Electrode': {'mask': (0, 255, 0)},
+        'groove_center': {'mask': (230, 230, 230)},
+        'Groove': {'mask': (0, 230, 230)}
+    }
+    electrode_point_color = (0, 0, 255)
+    groove_c_point_color = (50, 50, 255)
+
+    if is_draw_masks:
+        if prediction_output['groove_center_points'] is not None:
+            cv2.polylines(labeled, [prediction_output['groove_center_points']],
+                          isClosed=False, color=class_colors['groove_center']['mask'], thickness=3)
+
+        if prediction_output['electrode_contours'] is not None and prediction_output.get('bboxes') is not None:
+            for bbox_info in prediction_output['bboxes']:
+                if bbox_info['label'] == 'W-Rod':
+                    x1, y1, x2, y2 = bbox_info['bbox']
+                    mask_box = np.zeros_like(labeled[:, :, 0], dtype=np.uint8)
+                    for cnt in prediction_output['electrode_contours']:
+                        cv2.drawContours(mask_box, [cnt], -1, 255, -1)
+                    mask_box[:y1] = 0
+                    mask_box[y2:] = 0
+                    mask_box[:, :x1] = 0
+                    mask_box[:, x2:] = 0
+                    labeled[mask_box > 0] = class_colors['Electrode']['mask']
+
+        if is_draw_groove_masks and prediction_output['groove_masks'] is not None:
+            for mask, bbox in zip(prediction_output['groove_masks'], prediction_output['groove_bboxes']):
+                x1, y1, x2, y2 = bbox
+                labeled[y1:y2, x1:x2][mask > 10] = class_colors['Groove']['mask']
+                cv2.rectangle(labeled, (x1, y1), (x2, y2), class_colors['Groove']['mask'], thickness=2)
+
+        if prediction_output['groove_center_point']:
+            cv2.circle(labeled, prediction_output['groove_center_point'], 5, groove_c_point_color, -1)
+
+        if prediction_output['electrode_point']:
+            cv2.circle(labeled, prediction_output['electrode_point'], 5, electrode_point_color, -1)
+
+        if prediction_output['bboxes'] is not None and camera_rotation_angle == 0:
+            colors = {'Electrode': (0, 100, 0), 'groove_center': (200, 100, 100)}
+            for bbox_info in prediction_output['bboxes']:
+                label = bbox_info['label']
                 if label == 'groove_center' or label == 'Groove':
+                    x1, y1, x2, y2 = bbox_info['bbox']
                     label_pos = (x2, (y1 + y2) // 2)
-                    label_txt = groove_lbl
-                else:
+                    cv2.rectangle(labeled, (x1, y1), (x2, y2), colors.get(label, (0, 200, 0)), 2)
+                    cv2.putText(labeled, groove_lbl, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
+                                0.6, colors.get(label, (200, 150, 150)), 2)
+                elif label == 'W-Rod':
+                    x1, y1, x2, y2 = bbox_info['bbox']
                     label_pos = (x1, y1 - 5)
-                    label_txt = wrod_lbl
-                cv2.rectangle(labeled, (x1, y1), (x2, y2), colors.get(label, (0, 200, 0)), 2)
-                cv2.putText(labeled, label_txt, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
-                            0.6, colors.get(label, (200, 150, 150)), 2)
-
-    # TODO: and rotate labeled frame back based on camera_rotation_angle
-
-    # if is_draw_distance:
-    #     if prediction_output['distance_mm'] is not None:
-    #         cv2.putText(labeled, f"Distance: {prediction_output['distance_mm']:.2f} mm", (50, 50),
-    #                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (10, 10, 10), 2)
+                    cv2.rectangle(labeled, (x1, y1), (x2, y2), colors.get(label, (0, 200, 0)), 2)
+                    cv2.putText(labeled, wrod_lbl, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
+                                0.6, colors.get(label, (200, 150, 150)), 2)
 
     return labeled
 
+def write_json_file(json_data, json_file_name):
+    '''data = json_data.copy()
+    for key, value in data.items():
+        if isinstance(value, np.ndarray):
+            data[key] = value.tolist()'''
 
+    def safe_convert(obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.integer, np.floating)):
+            return obj.item()
+        elif isinstance(obj, tuple):
+            return [safe_convert(x) for x in obj]
+        elif isinstance(obj, list):
+            return [safe_convert(x) for x in obj]
+        elif isinstance(obj, dict):
+            return {k: safe_convert(v) for k, v in obj.items()}
+        elif isinstance(obj, (int, float, str, bool)) or obj is None:
+            return obj
+        else:
+            # fallback to string if unknown type (prevent freezing)
+            return str(obj)
+
+    data = safe_convert(json_data)
+
+    final_filename = f"{json_file_name}.json"
+    with open(final_filename, "w") as json_file:
+        json.dump(data, json_file, indent=4)
         # json_file.flush()
         # os.fsync(json_file.fileno())
 

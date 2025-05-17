@@ -175,7 +175,7 @@ class CameraGUI(QWidget):
         except ValueError:
             width = 0.0
 
-        model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(Best) YOLOv11-rotated45" else get_masks_points_distance
+        model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(old) YOLOv11-rotated45 - best" else get_masks_points_distance
         prediction = model_func(frame, width, self.current_model, angle)
         labeled_frame = draw_masks_points_distance(frame, prediction, angle,
                                                    is_draw_masks=self.mask_checkbox.isChecked(),
