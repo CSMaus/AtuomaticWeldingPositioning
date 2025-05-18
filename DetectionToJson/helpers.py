@@ -278,23 +278,58 @@ def get_masks_points_distance(curr_frame,
                 ys, xs = np.where(mask_crop > 10)
                 bottom_idx = np.where(ys >= mask_crop.shape[0] - 5)[0]
 
-                if len(bottom_idx) > 0:
-                    mean_x = int(np.mean(xs[bottom_idx]) + bbox[0])
-                    mean_y = int(np.mean(ys[bottom_idx]) + y1_box)
-                    electrode_point = (mean_x, mean_y)
-                    electrode_bbox = bbox
+                # if len(bottom_idx) > 0:
+                mean_x = int(np.mean(xs) + bbox[0])
+                mean_y = int(np.mean(ys) + y1_box)
+                mean_bx = int(np.mean([bbox[0], bbox[2]]))
+                bott_y = int(np.max([y1_box, y2_box]))
+                electrode_point = (mean_bx, bott_y)
+                electrode_bbox = bbox
             else:
                 bbox = box.astype(int)
                 x1, y1, x2, y2 = bbox
                 groove_bboxes.append(bbox)
                 groove_masks.append(mask_uint8[y1:y2, x1:x2].copy())
 
-
-    groove_relative_label = None
-    if len(groove_bboxes) > 0 and electrode_bbox is not None:
-        groove_x = (groove_bboxes[0][0] + groove_bboxes[0][2]) // 2
+    """
+    groove_labeled = []
+    if electrode_bbox is not None:
         wrod_x = (electrode_bbox[0] + electrode_bbox[2]) // 2
-        groove_relative_label = "L-Gro" if groove_x < wrod_x else "R-Gro"
+        left_groove, right_groove = None, None
+        for bbox, mask in zip(groove_bboxes, groove_masks):
+            groove_x = (bbox[0] + bbox[2]) // 2
+            if groove_x < wrod_x:
+                if left_groove is None or groove_x > ((left_groove[0][0] + left_groove[0][2]) // 2):
+                    left_groove = (bbox, mask)
+            else:
+                if right_groove is None or groove_x < ((right_groove[0][0] + right_groove[0][2]) // 2):
+                    right_groove = (bbox, mask)
+        if left_groove:
+            groove_labeled.append(('L-Gro', *left_groove))
+        if right_groove:
+            groove_labeled.append(('R-Gro', *right_groove))
+            
+    """
+    groove_labeled = []
+    if electrode_bbox is not None:
+        wrod_x = (electrode_bbox[0] + electrode_bbox[2]) // 2
+        left_candidates = []
+        right_candidates = []
+
+        for bbox, mask in zip(groove_bboxes, groove_masks):
+            groove_x = (bbox[0] + bbox[2]) // 2
+            if groove_x < wrod_x:
+                left_candidates.append((bbox, mask))
+            else:
+                right_candidates.append((bbox, mask))
+
+        # Always pick one from each side if available
+        if left_candidates:
+            best_left = max(left_candidates, key=lambda b: (b[0][2] - b[0][0]) * (b[0][3] - b[0][1]))  # largest area
+            groove_labeled.append(('L-Gro', *best_left))
+        if right_candidates:
+            best_right = max(right_candidates, key=lambda b: (b[0][2] - b[0][0]) * (b[0][3] - b[0][1]))
+            groove_labeled.append(('R-Gro', *best_right))
 
     distance_mm = None
     if groove_center_point and electrode_point and electrode_bbox is not None:
@@ -319,12 +354,111 @@ def get_masks_points_distance(curr_frame,
         'electrode_contours': electrode_contours,
         'groove_center_point': groove_center_point,
         'groove_bboxes': groove_bboxes,
-        'groove_relative_label': groove_relative_label,
+        'groove_labeled': groove_labeled,
         'groove_masks': groove_masks,
         'electrode_point': electrode_point,
         'distance_mm': distance_mm,
         'bboxes': bboxes
     }
+
+
+
+def draw_masks_points_distance(curr_frame, prediction_output,
+                               camera_rotation_angle=0,
+                               is_draw_masks=True,
+                               is_draw_distance=True,
+                               is_draw_groove_masks=True,
+                               isuseNewLabels=True,
+                               alpha = 0.2):
+    """
+    :param curr_frame:
+    :param prediction_output:
+    :param camera_rotation_angle:
+    :param is_draw_masks: draw or hide all predictions
+    :param is_draw_distance: display or not calculated distance text
+    :param is_draw_groove_masks: draw or hide ONLY masks for groove edges
+    :param isuseNewLabels: will be removed
+    :param alpha: 0 = transparent, 1 = opaque
+    :return:
+    """
+    labeled = curr_frame.copy()
+
+    wrod_lbl = "W-Rod"
+    groove_lbl = prediction_output.get('groove_relative_label', "Groove")
+    if not isuseNewLabels:
+        wrod_lbl = "W-rod"
+        groove_lbl = "Center"
+
+    class_colors = {
+        'Electrode': {'mask': (0, 255, 0)},
+        'groove_center': {'mask': (230, 230, 230)},
+        'Groove': {'mask': (20, 180, 210)}
+    }
+    electrode_point_color = (0, 0, 255)
+    groove_c_point_color = (50, 50, 255)
+
+    if is_draw_masks:
+        if prediction_output['groove_center_points'] is not None:
+            cv2.polylines(labeled, [prediction_output['groove_center_points']],
+                          isClosed=False, color=class_colors['groove_center']['mask'], thickness=3)
+
+        if prediction_output['electrode_contours'] is not None and prediction_output.get('bboxes') is not None:
+            for bbox_info in prediction_output['bboxes']:
+                if bbox_info['label'] == 'W-Rod':
+                    x1, y1, x2, y2 = bbox_info['bbox']
+                    mask_box = np.zeros_like(labeled[:, :, 0], dtype=np.uint8)
+                    for cnt in prediction_output['electrode_contours']:
+                        cv2.drawContours(mask_box, [cnt], -1, 255, 2)
+                    mask_box[:y1, :] = 0
+                    mask_box[y2:, :] = 0
+                    mask_box[:, :x1] = 0
+                    mask_box[:, x2:] = 0
+                    labeled[mask_box > 0] = class_colors['Electrode']['mask']
+        '''
+        if is_draw_groove_masks and prediction_output['groove_masks'] is not None:
+            for mask, bbox in zip(prediction_output['groove_masks'], prediction_output['groove_bboxes']):
+                x1, y1, x2, y2 = bbox
+                labeled[y1:y2, x1:x2][mask > 10] = class_colors['Groove']['mask']
+                cv2.rectangle(labeled, (x1, y1), (x2, y2), class_colors['Groove']['mask'], thickness=2)
+        '''
+        if is_draw_masks and 'groove_labeled' in prediction_output:
+            for label_txt, bbox, mask in prediction_output['groove_labeled']:
+                x1, y1, x2, y2 = bbox
+                if is_draw_groove_masks:
+                    # labeled[y1:y2, x1:x2][mask > 10] = class_colors['Groove']['mask']
+                    overlay = labeled.copy()
+                    overlay[y1:y2, x1:x2][mask > 10] = class_colors['Groove']['mask']
+                    labeled = cv2.addWeighted(overlay, alpha, labeled, 1 - alpha, 0)
+                cv2.rectangle(labeled, (x1, y1), (x2, y2), class_colors['Groove']['mask'], thickness=2)
+                cv2.putText(labeled, label_txt, (x2, (y1 + y2) // 2),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, class_colors['Groove']['mask'], 2)
+
+        if prediction_output['groove_center_point']:
+            cv2.circle(labeled, prediction_output['groove_center_point'], 5, groove_c_point_color, -1)
+
+        if prediction_output['electrode_point']:
+            cv2.circle(labeled, prediction_output['electrode_point'], 5, electrode_point_color, -1)
+
+        if prediction_output['bboxes'] is not None and camera_rotation_angle == 0:
+            colors = {'Electrode': (0, 100, 0), 'groove_center': (200, 100, 100)}
+            for bbox_info in prediction_output['bboxes']:
+                label = bbox_info['label']
+                '''if label == 'groove_center' or label == 'Groove':
+                    x1, y1, x2, y2 = bbox_info['bbox']
+                    label_pos = (x2, (y1 + y2) // 2)
+                    cv2.rectangle(labeled, (x1, y1), (x2, y2), colors.get(label, (0, 200, 0)), 2)
+                    cv2.putText(labeled, groove_lbl, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
+                                0.6, colors.get(label, (200, 150, 150)), 2)
+                el
+                '''
+                if label == 'W-Rod':
+                    x1, y1, x2, y2 = bbox_info['bbox']
+                    label_pos = (x1, y1 - 5)
+                    cv2.rectangle(labeled, (x1, y1), (x2, y2), colors.get(label, (0, 200, 0)), 2)
+                    cv2.putText(labeled, wrod_lbl, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
+                                0.6, colors.get(label, (200, 150, 150)), 2)
+
+    return labeled
 
 
 
@@ -395,77 +529,6 @@ def draw_masks_points_distance_0(curr_frame, prediction_output,
                     cv2.rectangle(labeled, (x1, y1), (x2, y2), colors.get(label, (0, 200, 0)), 2)
                     cv2.putText(labeled, label_txt, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
                                 0.6, colors.get(label, (200, 150, 150)), 2)
-    return labeled
-
-def draw_masks_points_distance(curr_frame, prediction_output,
-                               camera_rotation_angle=0,
-                               is_draw_masks=True,
-                               is_draw_distance=True,
-                               is_draw_groove_masks=True,
-                               isuseNewLabels=True):
-    labeled = curr_frame.copy()
-
-    wrod_lbl = "W-Rod"
-    groove_lbl = prediction_output.get('groove_relative_label', "Groove")
-    if not isuseNewLabels:
-        wrod_lbl = "W-rod"
-        groove_lbl = "Center"
-
-    class_colors = {
-        'Electrode': {'mask': (0, 255, 0)},
-        'groove_center': {'mask': (230, 230, 230)},
-        'Groove': {'mask': (0, 230, 230)}
-    }
-    electrode_point_color = (0, 0, 255)
-    groove_c_point_color = (50, 50, 255)
-
-    if is_draw_masks:
-        if prediction_output['groove_center_points'] is not None:
-            cv2.polylines(labeled, [prediction_output['groove_center_points']],
-                          isClosed=False, color=class_colors['groove_center']['mask'], thickness=3)
-
-        if prediction_output['electrode_contours'] is not None and prediction_output.get('bboxes') is not None:
-            for bbox_info in prediction_output['bboxes']:
-                if bbox_info['label'] == 'W-Rod':
-                    x1, y1, x2, y2 = bbox_info['bbox']
-                    mask_box = np.zeros_like(labeled[:, :, 0], dtype=np.uint8)
-                    for cnt in prediction_output['electrode_contours']:
-                        cv2.drawContours(mask_box, [cnt], -1, 255, -1)
-                    mask_box[:y1] = 0
-                    mask_box[y2:] = 0
-                    mask_box[:, :x1] = 0
-                    mask_box[:, x2:] = 0
-                    labeled[mask_box > 0] = class_colors['Electrode']['mask']
-
-        if is_draw_groove_masks and prediction_output['groove_masks'] is not None:
-            for mask, bbox in zip(prediction_output['groove_masks'], prediction_output['groove_bboxes']):
-                x1, y1, x2, y2 = bbox
-                labeled[y1:y2, x1:x2][mask > 10] = class_colors['Groove']['mask']
-                cv2.rectangle(labeled, (x1, y1), (x2, y2), class_colors['Groove']['mask'], thickness=2)
-
-        if prediction_output['groove_center_point']:
-            cv2.circle(labeled, prediction_output['groove_center_point'], 5, groove_c_point_color, -1)
-
-        if prediction_output['electrode_point']:
-            cv2.circle(labeled, prediction_output['electrode_point'], 5, electrode_point_color, -1)
-
-        if prediction_output['bboxes'] is not None and camera_rotation_angle == 0:
-            colors = {'Electrode': (0, 100, 0), 'groove_center': (200, 100, 100)}
-            for bbox_info in prediction_output['bboxes']:
-                label = bbox_info['label']
-                if label == 'groove_center' or label == 'Groove':
-                    x1, y1, x2, y2 = bbox_info['bbox']
-                    label_pos = (x2, (y1 + y2) // 2)
-                    cv2.rectangle(labeled, (x1, y1), (x2, y2), colors.get(label, (0, 200, 0)), 2)
-                    cv2.putText(labeled, groove_lbl, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
-                                0.6, colors.get(label, (200, 150, 150)), 2)
-                elif label == 'W-Rod':
-                    x1, y1, x2, y2 = bbox_info['bbox']
-                    label_pos = (x1, y1 - 5)
-                    cv2.rectangle(labeled, (x1, y1), (x2, y2), colors.get(label, (0, 200, 0)), 2)
-                    cv2.putText(labeled, wrod_lbl, label_pos, cv2.FONT_HERSHEY_SIMPLEX,
-                                0.6, colors.get(label, (200, 150, 150)), 2)
-
     return labeled
 
 def write_json_file(json_data, json_file_name):
