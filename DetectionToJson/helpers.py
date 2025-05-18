@@ -3,8 +3,6 @@ import numpy as np
 import json
 import os
 import builtins
-# TODO: display L-groove and R-Groove
-# TODO: display groove masks as contours
 # TODO: calculate the distance between groove and rod
 
 

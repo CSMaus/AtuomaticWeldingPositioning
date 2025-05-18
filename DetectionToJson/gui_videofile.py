@@ -4,6 +4,8 @@ import sys
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QCheckBox, QLineEdit
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtWidgets import QSlider
+from PyQt6.QtCore import Qt
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -66,6 +68,22 @@ class VideoGUI(QWidget):
         checkbox_layout.addWidget(self.grMask_checkbox)
         layout.addLayout(checkbox_layout)
 
+        alpha_layout = QHBoxLayout()
+        alpha_layout.addWidget(QLabel("Groove Mask Opacity:"))
+        self.alpha_slider = QSlider(Qt.Orientation.Horizontal)
+        self.alpha_slider.setFixedHeight(20)
+        self.alpha_slider.setMinimum(0)
+        self.alpha_slider.setMaximum(100)
+        self.alpha_slider.setValue(40)
+        self.alpha_slider.setSingleStep(1)
+        self.alpha_label = QLabel("0.40")
+        self.alpha_label.setFixedHeight(20)
+        self.alpha_slider.valueChanged.connect(self.update_alpha_label)
+
+        alpha_layout.addWidget(self.alpha_slider)
+        alpha_layout.addWidget(self.alpha_label)
+        layout.addLayout(alpha_layout)
+
         input_layout = QHBoxLayout()
         self.angle_input = QLineEdit("0")
         self.width_input = QLineEdit("4.03")
@@ -106,6 +124,10 @@ class VideoGUI(QWidget):
 
         self.latest_prediction = None
         self.setLayout(layout)
+
+    def update_alpha_label(self):
+        alpha = self.alpha_slider.value() / 100
+        self.alpha_label.setText(f"{alpha:.2f}")
 
     def change_video(self):
         selected = self.video_dropdown.currentText()
@@ -164,7 +186,8 @@ class VideoGUI(QWidget):
         labeled_frame = draw_masks_points_distance(frame, prediction, angle,
                                                    is_draw_masks=self.mask_checkbox.isChecked(),
                                                    is_draw_distance=self.distance_checkbox.isChecked(),
-                                                   is_draw_groove_masks=self.grMask_checkbox.isChecked())
+                                                   is_draw_groove_masks=self.grMask_checkbox.isChecked(),
+                                                   alpha=self.alpha_slider.value() / 100)
 
         rgb_image = cv2.cvtColor(labeled_frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_image.shape
