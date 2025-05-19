@@ -1,6 +1,8 @@
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QCheckBox, QLineEdit
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtWidgets import QSlider
+from PyQt6.QtCore import Qt
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -19,28 +21,53 @@ class CameraGUI(QWidget):
     def init_ui(self):
         self.setWindowTitle('Camera Prediction GUI')
         self.cap = None
+
         layout = QVBoxLayout()
+
         cam_layout = QHBoxLayout()
         self.camera_dropdown = QComboBox()
         self.populate_cameras()
         self.camera_dropdown.currentIndexChanged.connect(self.change_camera)
         cam_layout.addWidget(QLabel("Camera:"))
         cam_layout.addWidget(self.camera_dropdown)
+
         self.model_selector = QComboBox()
         self.model_selector.addItems(["(new) W-Rod, Groove", "(old) YOLOv11-rotated45 - best", "(old) YOLOv11 - without rotation"])
         self.model_selector.currentIndexChanged.connect(self.load_selected_model)
         self.load_selected_model()
         cam_layout.addWidget(QLabel("Model:"))
         cam_layout.addWidget(self.model_selector)
+
         layout.addLayout(cam_layout)
+
         checkbox_layout = QHBoxLayout()
         self.mask_checkbox = QCheckBox("Draw Masks")
         self.mask_checkbox.setChecked(True)
         self.distance_checkbox = QCheckBox("Draw Distance")
         self.distance_checkbox.setChecked(True)
+        self.grMask_checkbox = QCheckBox("Draw Groove Masks")
+        self.grMask_checkbox.setChecked(True)
         checkbox_layout.addWidget(self.mask_checkbox)
         checkbox_layout.addWidget(self.distance_checkbox)
+        checkbox_layout.addWidget(self.grMask_checkbox)
         layout.addLayout(checkbox_layout)
+
+        alpha_layout = QHBoxLayout()
+        alpha_layout.addWidget(QLabel("Groove Mask Opacity:"))
+        self.alpha_slider = QSlider(Qt.Orientation.Horizontal)
+        self.alpha_slider.setFixedHeight(20)
+        self.alpha_slider.setMinimum(0)
+        self.alpha_slider.setMaximum(100)
+        self.alpha_slider.setValue(40)
+        self.alpha_slider.setSingleStep(1)
+        self.alpha_label = QLabel("0.40")
+        self.alpha_label.setFixedHeight(20)
+        self.alpha_slider.valueChanged.connect(self.update_alpha_label)
+
+        alpha_layout.addWidget(self.alpha_slider)
+        alpha_layout.addWidget(self.alpha_label)
+        layout.addLayout(alpha_layout)
+
         input_layout = QHBoxLayout()
         self.angle_input = QLineEdit("0")
         self.width_input = QLineEdit("4.03")
@@ -49,11 +76,14 @@ class CameraGUI(QWidget):
         input_layout.addWidget(QLabel("Electrode Width (mm):"))
         input_layout.addWidget(self.width_input)
         layout.addLayout(input_layout)
+
         self.video_label = QLabel()
         layout.addWidget(self.video_label)
+
         self.start_btn = QPushButton("Start")
         self.start_btn.clicked.connect(self.toggle_camera)
         layout.addWidget(self.start_btn)
+
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
         record_layout = QHBoxLayout()
@@ -63,6 +93,7 @@ class CameraGUI(QWidget):
         self.record_checkbox = QCheckBox("Record JSON")
         record_layout.addWidget(self.record_checkbox)
         layout.addLayout(record_layout)
+
         self.json_timer = QTimer()
         self.json_timer.timeout.connect(self.save_json_periodically)
         self.json_timer.start(500)
@@ -70,8 +101,13 @@ class CameraGUI(QWidget):
         self.interval_input = QLineEdit("500")
         record_layout.addWidget(QLabel("Save every (ms):"))
         record_layout.addWidget(self.interval_input)
+
         self.interval_input.editingFinished.connect(self.update_json_timer_interval)
         self.setLayout(layout)
+
+    def update_alpha_label(self):
+        alpha = self.alpha_slider.value() / 100
+        self.alpha_label.setText(f"{alpha:.2f}")
 
     def change_camera(self):
         if self.timer.isActive():
@@ -99,9 +135,8 @@ class CameraGUI(QWidget):
 
     def populate_cameras(self):
         self.camera_dropdown.clear()
-        # Add Basler as option
+        # Basler
         self.camera_dropdown.addItem("Basler GigE", "basler")
-        # Add normal USB cameras
         for i in range(5):
             cap = cv2.VideoCapture(i)
             if cap.read()[0]:
@@ -179,7 +214,9 @@ class CameraGUI(QWidget):
         prediction = model_func(frame, width, self.current_model, angle)
         labeled_frame = draw_masks_points_distance(frame, prediction, angle,
                                                    is_draw_masks=self.mask_checkbox.isChecked(),
-                                                   is_draw_distance=self.distance_checkbox.isChecked())
+                                                   is_draw_distance=self.distance_checkbox.isChecked(),
+                                                   is_draw_groove_masks=self.grMask_checkbox.isChecked(),
+                                                   alpha=self.alpha_slider.value() / 100)
 
         rgb_image = cv2.cvtColor(labeled_frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_image.shape
