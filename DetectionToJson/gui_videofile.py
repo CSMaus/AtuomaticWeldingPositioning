@@ -11,9 +11,6 @@ import numpy as np
 from ultralytics import YOLO
 from helpers import get_masks_points_distance, get_masks_points_distance45, draw_masks_points_distance, write_json_file
 
-# TODO: draw electrode contours of mask only!
-# TODO: correct the labels for groove L and R
-# TODO: draw only one L-gro and R-gro
 
 path = os.path.join(Path.cwd().parents[2], "data/")
 

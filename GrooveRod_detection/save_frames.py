@@ -22,7 +22,7 @@ def read_and_save_video_frames(video_path, tosave_path, frames_step = 5):
         ret, frame = cap.read()
         if not ret:
             break
-        if frame_id % 5 == 0:
+        if frame_id % frames_step == 0:
             cv2.imwrite(f"{tosave_path}/{name}-frame_{frame_id:04d}.jpg", frame)
             # save_id += 1
         frame_id += 1
