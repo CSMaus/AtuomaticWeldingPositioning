@@ -171,6 +171,62 @@ class CameraGUI(QWidget):
             self.current_model = YOLO("electrode_groove_seg/weights/best.pt")
         self.current_model.predict(np.zeros((640, 640, 3), dtype=np.uint8), verbose=False)
 
+    '''def update_frame(self):
+        if self.is_basler and self.basler_cam is not None and self.basler_cam.IsGrabbing():
+            grab = self.basler_cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
+            if grab.GrabSucceeded():
+                img = grab.Array
+
+                if img.ndim == 3 and img.shape[2] == 2:
+                    h, w, _ = img.shape
+                    # Correct horizontal interleaving of channels
+                    bayer_img = np.empty((h, w * 2), dtype=np.uint8)
+                    bayer_img[:, 0::2] = img[:, :, 0]
+                    bayer_img[:, 1::2] = img[:, :, 1]
+
+                    # Correct Bayer pattern for ICX274 sensor is BayerBG8:
+                    frame = cv2.cvtColor(bayer_img, cv2.COLOR_BAYER_BG2BGR)
+
+                elif img.ndim == 2:
+                    frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2BGR)
+                elif img.ndim == 3 and img.shape[2] == 3:
+                    frame = img
+                else:
+                    raise ValueError(f"Unsupported image shape {img.shape}")
+
+                grab.Release()
+            else:
+                return
+        else:
+            return
+
+        try:
+            angle = float(self.angle_input.text().strip())
+        except ValueError:
+            angle = 0.0
+        try:
+            width = float(self.width_input.text().strip())
+        except ValueError:
+            width = 0.0
+
+        model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(old) YOLOv11-rotated45 - best" else get_masks_points_distance
+        prediction = model_func(frame, width, self.current_model, angle)
+        labeled_frame = draw_masks_points_distance(frame, prediction, angle,
+                                                   is_draw_masks=self.mask_checkbox.isChecked(),
+                                                   is_draw_distance=self.distance_checkbox.isChecked(),
+                                                   is_draw_groove_masks=self.grMask_checkbox.isChecked(),
+                                                   alpha=self.alpha_slider.value() / 100)
+
+        rgb_image = cv2.cvtColor(labeled_frame, cv2.COLOR_BGR2RGB)
+        h, w, ch = rgb_image.shape
+        bytes_per_line = ch * w
+        convert_to_Qt_format = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+        self.video_label.setPixmap(
+            QPixmap.fromImage(convert_to_Qt_format).scaled(self.video_label.width(), self.video_label.height()))
+        if self.record_checkbox.isChecked():
+            self.latest_prediction = prediction'''
+
+
     def update_frame(self):
         if self.is_basler and self.basler_cam is not None and self.basler_cam.IsGrabbing():
             grab = self.basler_cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
@@ -178,16 +234,21 @@ class CameraGUI(QWidget):
                 img = grab.Array
 
                 if img.ndim == 3 and img.shape[2] == 2:
-                    height, width, _ = img.shape
-                    img_uint16 = img.view(np.uint16).reshape(height, width)
+                    h, w, _ = img.shape
+                    img_uint16 = img.view(np.uint16).reshape(h, w)
+
                     # todo: fix the problem with conversion
                     # the use of COLOR_YUV2BGR_YUY2 should work but destroys the image
                     # the use of COLOR_YUV2BGR_YUY2 gives error, but should give desired
                     # result for other versions of camera
                     # maybe drivers problem?
                     # todo: check drivers problem & overhiting
-                    img_uint8 = (img_uint16 & 0xFF).astype(np.uint8)  # gray image
+
+                    # img_uint8 = (img_uint16 & 0xFF).astype(np.uint8)  # gray image
+                    # frame = cv2.cvtColor(img_uint8, cv2.COLOR_BAYER_BG2BGR)
+                    img_uint8 = (img_uint16 >> 8).astype(np.uint8)  # this works but the image is still grayscale
                     frame = cv2.cvtColor(img_uint8, cv2.COLOR_BAYER_BG2BGR)
+
 
                 elif img.ndim == 2:
                     frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2BGR)
@@ -218,6 +279,8 @@ class CameraGUI(QWidget):
                                                    is_draw_groove_masks=self.grMask_checkbox.isChecked(),
                                                    alpha=self.alpha_slider.value() / 100)
 
+        # labeled_frame = frame
+
         rgb_image = cv2.cvtColor(labeled_frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_image.shape
         bytes_per_line = ch * w
@@ -225,6 +288,8 @@ class CameraGUI(QWidget):
         self.video_label.setPixmap(QPixmap.fromImage(convert_to_Qt_format).scaled(self.video_label.width(), self.video_label.height()))
         if self.record_checkbox.isChecked():
             self.latest_prediction = prediction
+
+
 
     def save_json_periodically(self):
         if self.record_checkbox.isChecked() and self.latest_prediction is not None:
