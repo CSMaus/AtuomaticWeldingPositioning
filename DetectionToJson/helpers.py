@@ -182,19 +182,23 @@ def get_masks_points_distance45(curr_frame,
 
     return {
         'groove_center_points': groove_center_points,
-        'electrode_contours': electrode_contours,
+        'w_rod_contours': electrode_contours,
         'groove_center_point': groove_center_point,
-        'electrode_point': electrode_point,
+        'w_rod_point': electrode_point,
         'distance_mm': distance_mm,
         'bboxes': None
     }
+
+def scale_points(points, scale_x, scale_y):
+    return np.array([[int(x * scale_x), int(y * scale_y)] for x, y in points])
+
 
 def get_masks_points_distance(curr_frame,
                               electrode_width_mm,
                               yolo_model,
                               camera_rotation_angle=0,
                               is_smooth_points=False,
-                              alpha=0.9):
+                              alpha=0.9, resize_factor=0.5):
     """
         Predict masks of electrode and groove center and calculate
         their positions as points, and distance (yolo11n-seg)
@@ -214,9 +218,23 @@ def get_masks_points_distance(curr_frame,
     # TODO: rotate the curr_frame based on camera_rotation_angle to make it normal. i e if camera rotation angle is 0,
     # then it should be as it is, otherwise we have to rotate it to the needed angle
     # curr_frame =
-    curr_frame, rot_matrix, inv_matrix, new_w, new_h = rotate_image_with_inverse(curr_frame, camera_rotation_angle)
 
-    results = yolo_model.predict(curr_frame, verbose=False)[0]
+    # curr_frame, rot_matrix, inv_matrix, new_w, new_h = rotate_image_with_inverse(curr_frame, camera_rotation_angle)
+
+
+
+    original_h, original_w = curr_frame.shape[:2]
+    # scale_x = original_w / resize_dim[0]
+    # scale_y = original_h / resize_dim[1]
+    # curr_frame_resized = cv2.resize(curr_frame, resize_dim)  # resize_dim=(640, 640)
+    scale_x = 1 / resize_factor
+    scale_y = 1 / resize_factor
+    curr_frame_resized = cv2.resize(curr_frame, None, fx=resize_factor, fy=resize_factor)
+
+
+
+    # results = yolo_model.predict(curr_frame, verbose=False)[0]
+    results = yolo_model.predict(curr_frame_resized, verbose=False)[0]
 
     groove_center_points, electrode_contours, groove_center_point, electrode_point, electrode_bbox = None, None, None, None, None
     bboxes = []
@@ -230,10 +248,17 @@ def get_masks_points_distance(curr_frame,
         boxes = results.boxes.xyxy.cpu().numpy()
         classes = results.boxes.cls.cpu().numpy().astype(int)
 
+        boxes[:, [0, 2]] *= scale_x
+        boxes[:, [1, 3]] *= scale_y
+
+
         names = yolo_model.names
         for mask, box, cls_id in zip(masks, boxes, classes):
             label = names[cls_id]
-            mask_resized = cv2.resize(mask, (curr_frame.shape[1], curr_frame.shape[0]))
+            # mask_resized = cv2.resize(mask, (curr_frame.shape[1], curr_frame.shape[0]))
+            mask_uint8 = (mask * 255).astype(np.uint8)
+            mask_resized  = cv2.resize(mask_uint8, (original_w, original_h))
+
             mask_uint8 = (mask_resized * 255).astype(np.uint8)
             bbox = box.astype(int)
             bboxes.append({'label': label, 'bbox': bbox.tolist()})
@@ -277,8 +302,8 @@ def get_masks_points_distance(curr_frame,
                 bottom_idx = np.where(ys >= mask_crop.shape[0] - 5)[0]
 
                 # if len(bottom_idx) > 0:
-                mean_x = int(np.mean(xs) + bbox[0])
-                mean_y = int(np.mean(ys) + y1_box)
+                mean_x = int(np.mean(xs) + bbox[0]) if xs.size > 0 else bbox[0]
+                mean_y = int(np.mean(ys) + y1_box) if ys.size > 0 else y1_box
                 mean_bx = int(np.mean([bbox[0], bbox[2]]))
                 bott_y = int(np.max([y1_box, y2_box]))
                 electrode_point = (mean_bx, bott_y)
@@ -321,7 +346,6 @@ def get_masks_points_distance(curr_frame,
             else:
                 right_candidates.append((bbox, mask))
 
-        # Always pick one from each side if available
         if left_candidates:
             best_left = max(left_candidates, key=lambda b: (b[0][2] - b[0][0]) * (b[0][3] - b[0][1]))  # largest area
             groove_labeled.append(('L-Gro', *best_left))
@@ -338,23 +362,23 @@ def get_masks_points_distance(curr_frame,
         distance_mm = raw_dx_mm * np.cos(np.radians(camera_rotation_angle))
 
     # rotate all back to display contours correctly after rotating frame to camera angle
-    if groove_center_points is not None:
+    """if groove_center_points is not None:
         groove_center_points = apply_inverse_transform(groove_center_points, inv_matrix).reshape((-1, 1, 2))
     if electrode_contours is not None:
         electrode_contours = [apply_inverse_transform(cnt[:, 0, :], inv_matrix).reshape(-1, 1, 2) for cnt in electrode_contours]
     if electrode_point is not None:
         electrode_point = tuple(apply_inverse_transform([electrode_point], inv_matrix)[0])
     if groove_center_point is not None:
-        groove_center_point = tuple(apply_inverse_transform([groove_center_point], inv_matrix)[0])
+        groove_center_point = tuple(apply_inverse_transform([groove_center_point], inv_matrix)[0])"""
 
     return {
         'groove_center_points': groove_center_points,
-        'electrode_contours': electrode_contours,
+        'w_rod_contours': electrode_contours,
         'groove_center_point': groove_center_point,
         'groove_bboxes': groove_bboxes,
         'groove_labeled': groove_labeled,
         'groove_masks': groove_masks,
-        'electrode_point': electrode_point,
+        'w_rod_point': electrode_point,
         'distance_mm': distance_mm,
         'bboxes': bboxes
     }
@@ -388,7 +412,7 @@ def draw_masks_points_distance(curr_frame, prediction_output,
         groove_lbl = "Center"
 
     class_colors = {
-        'Electrode': {'mask': (0, 255, 0)},
+        'W-Rod': {'mask': (0, 255, 0)},
         'groove_center': {'mask': (230, 230, 230)},
         'Groove': {'mask': (20, 180, 210)}
     }
@@ -400,18 +424,18 @@ def draw_masks_points_distance(curr_frame, prediction_output,
             cv2.polylines(labeled, [prediction_output['groove_center_points']],
                           isClosed=False, color=class_colors['groove_center']['mask'], thickness=3)
 
-        if prediction_output['electrode_contours'] is not None and prediction_output.get('bboxes') is not None:
+        if prediction_output['w_rod_contours'] is not None and prediction_output.get('bboxes') is not None:
             for bbox_info in prediction_output['bboxes']:
                 if bbox_info['label'] == 'W-Rod':
                     x1, y1, x2, y2 = bbox_info['bbox']
                     mask_box = np.zeros_like(labeled[:, :, 0], dtype=np.uint8)
-                    for cnt in prediction_output['electrode_contours']:
+                    for cnt in prediction_output['w_rod_contours']:
                         cv2.drawContours(mask_box, [cnt], -1, 255, 2)
                     mask_box[:y1, :] = 0
                     mask_box[y2:, :] = 0
                     mask_box[:, :x1] = 0
                     mask_box[:, x2:] = 0
-                    labeled[mask_box > 0] = class_colors['Electrode']['mask']
+                    labeled[mask_box > 0] = class_colors['W-Rod']['mask']
         '''
         if is_draw_groove_masks and prediction_output['groove_masks'] is not None:
             for mask, bbox in zip(prediction_output['groove_masks'], prediction_output['groove_bboxes']):
@@ -434,11 +458,11 @@ def draw_masks_points_distance(curr_frame, prediction_output,
         if prediction_output['groove_center_point']:
             cv2.circle(labeled, prediction_output['groove_center_point'], 5, groove_c_point_color, -1)
 
-        if prediction_output['electrode_point']:
-            cv2.circle(labeled, prediction_output['electrode_point'], 5, electrode_point_color, -1)
+        if prediction_output['w_rod_point']:
+            cv2.circle(labeled, prediction_output['w_rod_point'], 5, electrode_point_color, -1)
 
         if prediction_output['bboxes'] is not None and camera_rotation_angle == 0:
-            colors = {'Electrode': (0, 100, 0), 'groove_center': (200, 100, 100)}
+            colors = {'W-Rod': (0, 100, 0), 'groove_center': (200, 100, 100)}
             for bbox_info in prediction_output['bboxes']:
                 label = bbox_info['label']
                 '''if label == 'groove_center' or label == 'Groove':

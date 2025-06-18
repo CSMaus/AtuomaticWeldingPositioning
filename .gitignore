@@ -22,3 +22,4 @@ CNN/yolo11n-seg.pt
 /GrooveRod_detection/RetrainYOLO/runs
 /GrooveRod_detection/RetrainYOLO/dataset_labeling/labels
 *.pt
+DetectionToJson/predictions.json

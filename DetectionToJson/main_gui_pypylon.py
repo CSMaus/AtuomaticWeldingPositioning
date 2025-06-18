@@ -1,3 +1,5 @@
+import time
+
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QCheckBox, QLineEdit
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QImage, QPixmap
@@ -17,6 +19,8 @@ class CameraGUI(QWidget):
         self.init_ui()
         self.is_basler = False
         self.basler_cam = None
+        self.num_iter = 0
+        self.dt = 0
 
     def init_ui(self):
         self.setWindowTitle('Camera Prediction GUI')
@@ -75,6 +79,11 @@ class CameraGUI(QWidget):
         input_layout.addWidget(self.angle_input)
         input_layout.addWidget(QLabel("Electrode Width (mm):"))
         input_layout.addWidget(self.width_input)
+
+        input_layout.addWidget(QLabel("Resize Factor:"))
+        self.resize_input = QLineEdit("0.5")
+        input_layout.addWidget(self.resize_input)
+
         layout.addLayout(input_layout)
 
         self.video_label = QLabel()
@@ -154,9 +163,17 @@ class CameraGUI(QWidget):
             self.timer.stop()
             self.release_camera()
             self.start_btn.setText("Start")
+            if self.num_iter !=0:
+                print(f"Average time per frame with Resize Factor={self.resize_input.text()}: ", self.dt / self.num_iter)
+                self.dt = 0
+                self.num_iter = 0
         else:
             self.change_camera()
             self.start_btn.setText("Stop")
+            if self.num_iter != 0:
+                print(f"Average time per frame with Resize Factor={self.resize_input.text()}: ", self.dt/self.num_iter)
+                self.dt = 0
+                self.num_iter = 0
 
     def release_camera(self):
         if self.is_basler and self.basler_cam is not None:
@@ -277,8 +294,14 @@ class CameraGUI(QWidget):
         except ValueError:
             width = 0.0
 
+        try:
+            resize_factor = float(self.resize_input.text().strip())
+        except ValueError:
+            resize_factor = 1.0
+
         model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(old) YOLOv11-rotated45 - best" else get_masks_points_distance
-        prediction = model_func(frame, width, self.current_model, angle)
+        st = time.time()
+        prediction = model_func(frame, width, self.current_model, angle, resize_factor=resize_factor)
         labeled_frame = draw_masks_points_distance(frame, prediction, angle,
                                                    is_draw_masks=self.mask_checkbox.isChecked(),
                                                    is_draw_distance=self.distance_checkbox.isChecked(),
@@ -295,7 +318,9 @@ class CameraGUI(QWidget):
         if self.record_checkbox.isChecked():
             self.latest_prediction = prediction
 
-
+        en = time.time()
+        self.dt += en - st
+        self.num_iter += 1
 
     def save_json_periodically(self):
         if self.record_checkbox.isChecked() and self.latest_prediction is not None:

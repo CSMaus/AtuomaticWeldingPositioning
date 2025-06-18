@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 import os
 import sys
@@ -30,6 +31,8 @@ class VideoGUI(QWidget):
         self.videos_path = videos_path
         self.video_path = os.path.join(self.videos_path, self.videos[0])
         self.cap = None
+        self.num_iter = 0
+        self.dt = 0
         self.init_ui()
 
     def init_ui(self):
@@ -88,6 +91,11 @@ class VideoGUI(QWidget):
         input_layout.addWidget(self.angle_input)
         input_layout.addWidget(QLabel("Electrode Width (mm):"))
         input_layout.addWidget(self.width_input)
+
+        input_layout.addWidget(QLabel("Resize Factor:"))
+        self.resize_input = QLineEdit("0.5")
+        input_layout.addWidget(self.resize_input)
+
         layout.addLayout(input_layout)
 
         self.video_label = QLabel()
@@ -132,6 +140,8 @@ class VideoGUI(QWidget):
         if self.cap:
             self.cap.release()
         self.cap = cv2.VideoCapture(self.video_path)
+        print("Frame size:", int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)), "x",
+              int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
 
     def update_json_timer_interval(self):
         try:
@@ -146,10 +156,18 @@ class VideoGUI(QWidget):
             if self.cap:
                 self.cap.release()
             self.start_btn.setText("Start Video")
+            if self.num_iter != 0:
+                print(f"Average time per frame with Resize Factor={self.resize_input.text()}: ", self.dt/self.num_iter)
+                self.dt = 0
+                self.num_iter = 0
         else:
             self.cap = cv2.VideoCapture(self.video_path)
             self.timer.start(30)
             self.start_btn.setText("Stop Video")
+            if self.num_iter !=0:
+                print(f"Average time per frame with Resize Factor={self.resize_input.text()}: ", self.dt/self.num_iter)
+                self.dt = 0
+                self.num_iter = 0
 
     def load_selected_model(self):
         model_name = self.model_selector.currentText()
@@ -177,14 +195,22 @@ class VideoGUI(QWidget):
         except ValueError:
             width = 0.0
 
-        model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(old) YOLOv11-rotated45 - best" else get_masks_points_distance
-        prediction = model_func(frame, width, self.current_model, angle)
+        try:
+            resize_factor = float(self.resize_input.text().strip())
+        except ValueError:
+            resize_factor = 1.0
 
+        model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(old) YOLOv11-rotated45 - best" else get_masks_points_distance
+        st = time.time()
+        prediction = model_func(frame, width, self.current_model, angle, resize_factor=resize_factor)
+
+        # print("Frame took: ", en-st)
         labeled_frame = draw_masks_points_distance(frame, prediction, angle,
                                                    is_draw_masks=self.mask_checkbox.isChecked(),
                                                    is_draw_distance=self.distance_checkbox.isChecked(),
                                                    is_draw_groove_masks=self.grMask_checkbox.isChecked(),
                                                    alpha=self.alpha_slider.value() / 100)
+
 
         rgb_image = cv2.cvtColor(labeled_frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_image.shape
@@ -192,6 +218,10 @@ class VideoGUI(QWidget):
         self.video_label.setPixmap(QPixmap.fromImage(qt_image).scaled(self.video_label.width(), self.video_label.height()))
         if self.record_checkbox.isChecked():
             self.latest_prediction = prediction
+
+        en = time.time()
+        self.dt += en - st
+        self.num_iter += 1
 
     def save_json_periodically(self):
         if self.record_checkbox.isChecked() and self.latest_prediction is not None:
