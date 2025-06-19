@@ -131,6 +131,7 @@ class CameraGUI(QWidget):
             self.is_basler = True
             self.basler_cam = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
             self.basler_cam.Open()
+            self.basler_cam.MaxNumBuffer = 5
             self.basler_cam.PixelFormat.SetValue("BayerBG8")
             # self.basler_cam.PixelFormat.SetValue("RGB8Packed")
             self.basler_cam.StartGrabbing()
@@ -196,20 +197,30 @@ class CameraGUI(QWidget):
 
 
     def update_frame(self):
+        st = time.time()
         if self.is_basler and self.basler_cam is not None and self.basler_cam.IsGrabbing():
-            grab = self.basler_cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
+            img = None
+            while True:  # flush queue
+                grab = self.basler_cam.RetrieveResult(
+                    0, pylon.TimeoutHandling_Return)  # 0 ms → non-blocking
+                if not grab or not grab.GrabSucceeded():
+                    break  # queue empty
+                img = grab.Array.copy()  # keep newest
+                grab.Release()
+
+            if img is None:  # nothing ready
+                return
+
+            '''grab = self.basler_cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
             if grab.GrabSucceeded():
                 img = grab.Array
                 grab.Release()
 
             else:
-                return
+                return'''
 
             if img.ndim == 2:
-                # Now correctly interpret as BayerBG8
                 frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
-                # print("Camera PixelFormat: ", self.basler_cam.PixelFormat.GetValue())
-                # print("Grabbed shape: ", img.shape)
             elif img.ndim == 3 and img.shape[2] == 2:
                 #        # Backup (shouldn't happen after PixelFormat set correctly)
                 #        img_uint16 = img.view(np.uint16).reshape(img.shape[0], img.shape[1])
@@ -224,64 +235,6 @@ class CameraGUI(QWidget):
             else:
                 raise ValueError(f"Unsupported image shape {img.shape}")
 
-            """
-            if grab.GrabSucceeded():
-                img = grab.Array
-                '''
-                if img.ndim == 3 and img.shape[2] == 2:
-                    h, w, _ = img.shape
-                    img_uint16 = img.view(np.uint16).reshape(h, w)
-
-                    # todo: fix the problem with conversion
-                    # the use of COLOR_YUV2BGR_YUY2 should work but destroys the image
-                    # the use of COLOR_YUV2BGR_YUY2 gives error, but should give desired
-                    # result for other versions of camera
-                    # maybe drivers problem?
-                    # todo: check drivers problem & overhiting
-
-                    # img_uint8 = (img_uint16 & 0xFF).astype(np.uint8)  # gray image
-                    # frame = cv2.cvtColor(img_uint8, cv2.COLOR_BAYER_BG2BGR)
-                    img_uint8 = (img_uint16 >> 8).astype(np.uint8)  # this works but the image is still grayscale
-                    frame = cv2.cvtColor(img_uint8, cv2.COLOR_BAYER_BG2BGR)
-                    '''
-
-                if img.ndim == 3 and img.shape[2] == 2:
-                    h, w, _ = img.shape
-                    print("Packed Bayer detected")
-                    img_uint16 = img.view(np.uint16).reshape(h, w)
-                    img8_msb = (img_uint16 >> 8).astype(np.uint8)
-                    img8_lsb = (img_uint16 & 0xFF).astype(np.uint8)
-
-                    cv2.imwrite("msb.png", img8_msb)
-                    cv2.imwrite("lsb.png", img8_lsb)
-
-                    for pattern in ["BAYER_BG2BGR", "BAYER_GB2BGR", "BAYER_RG2BGR", "BAYER_GR2BGR"]:
-                        try:
-                            conv = getattr(cv2, f"COLOR_{pattern}")
-                            test_frame = cv2.cvtColor(img8_msb, conv)
-                            cv2.imwrite(f"{pattern}_msb.png", test_frame)
-                        except Exception:
-                            pass
-                        try:
-                            test_frame = cv2.cvtColor(img8_lsb, conv)
-                            cv2.imwrite(f"{pattern}_lsb.png", test_frame)
-                        except Exception:
-                            pass
-
-                    raise Exception("Wrote test images—inspect which looks correct")
-
-
-                elif img.ndim == 2:
-                    frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2BGR)
-                elif img.ndim == 3 and img.shape[2] == 3:
-                    frame = img
-                else:
-                    raise ValueError(f"Unsupported image shape {img.shape}")
-                grab.Release()
-            else:
-                return
-            
-            """
         else:
             return
 
@@ -300,7 +253,7 @@ class CameraGUI(QWidget):
             resize_factor = 1.0
 
         model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(old) YOLOv11-rotated45 - best" else get_masks_points_distance
-        st = time.time()
+
         prediction = model_func(frame, width, self.current_model, angle, resize_factor=resize_factor)
         labeled_frame = draw_masks_points_distance(frame, prediction, angle,
                                                    is_draw_masks=self.mask_checkbox.isChecked(),
