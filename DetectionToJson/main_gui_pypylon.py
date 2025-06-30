@@ -1,7 +1,7 @@
 import time
 
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QCheckBox, QLineEdit
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QSlider
 from PyQt6.QtCore import Qt
@@ -13,12 +13,73 @@ import sys
 # pypylon for Basler camera
 from pypylon import pylon
 
+
+class CameraThread(QThread):
+    frame_ready = pyqtSignal(np.ndarray)
+
+    def __init__(self, is_basler=False, cam_idx=0):
+        super().__init__()
+        self.is_basler = is_basler
+        self.cam_idx = cam_idx
+        self.camera = None
+        self.cap = None
+        self.running = False
+
+    def setup_camera(self):
+        if self.is_basler:
+            self.camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
+            self.camera.Open()
+            self.camera.PixelFormat.SetValue("BayerBG8")
+            self.camera.MaxNumBuffer = 10
+            self.camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
+        else:
+            self.cap = cv2.VideoCapture(self.cam_idx)
+
+    def run(self):
+        self.setup_camera()
+        self.running = True
+        
+        while self.running:
+            frame = None
+            
+            if self.is_basler and self.camera is not None:
+                grab_result = self.camera.RetrieveResult(1000, pylon.TimeoutHandling_Return)
+                if grab_result and grab_result.GrabSucceeded():
+                    img = grab_result.Array.copy()
+                    grab_result.Release()
+                    
+                    if img.ndim == 2:
+                        frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
+                    elif img.ndim == 3 and img.shape[2] == 2:
+                        frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
+                    elif img.ndim == 3 and img.shape[2] == 3:
+                        frame = img
+                    else:
+                        continue
+            else:
+                if self.cap is not None:
+                    ret, frame = self.cap.read()
+                    if not ret:
+                        continue
+            
+            if frame is not None:
+                self.frame_ready.emit(frame)
+
+    def stop(self):
+        self.running = False
+        if self.is_basler and self.camera is not None:
+            self.camera.StopGrabbing()
+            self.camera.Close()
+        if self.cap is not None:
+            self.cap.release()
+        self.wait()
+
+
 class CameraGUI(QWidget):
     def __init__(self):
         super().__init__()
         self.init_ui()
-        self.is_basler = False
-        self.basler_cam = None
+        self.camera_thread = None
         self.num_iter = 0
         self.dt = 0
 
@@ -93,8 +154,7 @@ class CameraGUI(QWidget):
         self.start_btn.clicked.connect(self.toggle_camera)
         layout.addWidget(self.start_btn)
 
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_frame)
+        # Remove timer setup - we'll use thread instead
         record_layout = QHBoxLayout()
         self.json_name_input = QLineEdit("predictions")
         record_layout.addWidget(QLabel("JSON Filename:"))
@@ -123,22 +183,8 @@ class CameraGUI(QWidget):
         self.alpha_label.setText(f"{alpha:.2f}")
 
     def change_camera(self):
-        if self.timer.isActive():
-            self.timer.stop()
-            self.release_camera()
-        cam_idx = self.camera_dropdown.currentData()
-        if cam_idx == "basler":
-            self.is_basler = True
-            self.basler_cam = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
-            self.basler_cam.Open()
-            self.basler_cam.MaxNumBuffer = 5
-            self.basler_cam.PixelFormat.SetValue("BayerBG8")
-            # self.basler_cam.PixelFormat.SetValue("RGB8Packed")
-            self.basler_cam.StartGrabbing()
-        else:
-            self.is_basler = False
-            self.cap = cv2.VideoCapture(cam_idx)
-        self.timer.start(30)
+        # This method is no longer needed as camera setup is handled in thread
+        pass
 
     def update_json_timer_interval(self):
         try:
@@ -160,30 +206,26 @@ class CameraGUI(QWidget):
             cap.release()
 
     def toggle_camera(self):
-        if self.timer.isActive():
-            self.timer.stop()
-            self.release_camera()
+        if self.camera_thread and self.camera_thread.isRunning():
+            self.camera_thread.stop()
+            self.camera_thread = None
             self.start_btn.setText("Start")
-            if self.num_iter !=0:
+            if self.num_iter != 0:
                 print(f"Average time per frame with Resize Factor={self.resize_input.text()}: ", self.dt / self.num_iter)
                 self.dt = 0
                 self.num_iter = 0
         else:
-            self.change_camera()
+            cam_idx = self.camera_dropdown.currentData()
+            is_basler = (cam_idx == "basler")
+            
+            self.camera_thread = CameraThread(is_basler=is_basler, cam_idx=cam_idx if not is_basler else 0)
+            self.camera_thread.frame_ready.connect(self.update_frame)
+            self.camera_thread.start()
             self.start_btn.setText("Stop")
-            if self.num_iter != 0:
-                print(f"Average time per frame with Resize Factor={self.resize_input.text()}: ", self.dt/self.num_iter)
-                self.dt = 0
-                self.num_iter = 0
 
     def release_camera(self):
-        if self.is_basler and self.basler_cam is not None:
-            self.basler_cam.StopGrabbing()
-            self.basler_cam.Close()
-            self.basler_cam = None
-        if not self.is_basler and self.cap is not None:
-            self.cap.release()
-            self.cap = None
+        # This method is no longer needed as cleanup is handled in thread
+        pass
 
     def load_selected_model(self):
         model_name = self.model_selector.currentText()
@@ -196,48 +238,9 @@ class CameraGUI(QWidget):
         self.current_model.predict(np.zeros((640, 640, 3), dtype=np.uint8), verbose=False)
 
 
-    def update_frame(self):
+    def update_frame(self, frame):
         st = time.time()
-        if self.is_basler and self.basler_cam is not None and self.basler_cam.IsGrabbing():
-            img = None
-            while True:  # flush queue
-                grab = self.basler_cam.RetrieveResult(
-                    0, pylon.TimeoutHandling_Return)  # 0 ms → non-blocking
-                if not grab or not grab.GrabSucceeded():
-                    break  # queue empty
-                img = grab.Array.copy()  # keep newest
-                grab.Release()
-
-            if img is None:  # nothing ready
-                return
-
-            '''grab = self.basler_cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
-            if grab.GrabSucceeded():
-                img = grab.Array
-                grab.Release()
-
-            else:
-                return'''
-
-            if img.ndim == 2:
-                frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
-            elif img.ndim == 3 and img.shape[2] == 2:
-                #        # Backup (shouldn't happen after PixelFormat set correctly)
-                #        img_uint16 = img.view(np.uint16).reshape(img.shape[0], img.shape[1])
-                #        img_uint8 = (img_uint16 & 0xFF).astype(np.uint8)
-                #        # frame = cv2.cvtColor(img_uint8, cv2.COLOR_BAYER_BG2BGR)
-                #        frame = cv2.cvtColor(img_uint8, cv2.COLOR_BAYER_RG2RGB)
-                frame = img
-                frame = cv2.cvtColor(frame, cv2.COLOR_BAYER_BG2RGB)
-
-            elif img.ndim == 3 and img.shape[2] == 3:
-                frame = img
-            else:
-                raise ValueError(f"Unsupported image shape {img.shape}")
-
-        else:
-            return
-
+        
         try:
             angle = float(self.angle_input.text().strip())
         except ValueError:
@@ -281,9 +284,16 @@ class CameraGUI(QWidget):
             json_file_name = name_text if name_text else "predictions"
             write_json_file(self.latest_prediction, json_file_name)
 
+    def closeEvent(self, event):
+        if self.camera_thread and self.camera_thread.isRunning():
+            self.camera_thread.stop()
+        event.accept()
+
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = CameraGUI()
     window.resize(800, 800)
     window.show()
+    sys.exit(app.exec())
     sys.exit(app.exec())
