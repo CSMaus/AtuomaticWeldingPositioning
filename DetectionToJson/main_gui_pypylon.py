@@ -16,7 +16,7 @@ from time import time
 
 
 class CameraThread(QThread):
-    frame_ready = pyqtSignal(np.ndarray)  # QImage)  # np.ndarray)
+    frame_ready = pyqtSignal(np.ndarray)
 
     def __init__(self, is_basler=False, cam_idx=0):
         super().__init__()
@@ -24,22 +24,19 @@ class CameraThread(QThread):
         self.cam_idx = cam_idx
         self.camera = None
         self.cap = None
-        self.running = False
-
-    def setup_camera(self):
+        self.running = True
+        
+        # Setup camera in __init__ like the working code
         if self.is_basler:
             self.camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
             self.camera.Open()
             self.camera.PixelFormat.SetValue("BayerBG8")
-            self.camera.MaxNumBuffer = 10
+            self.camera.MaxNumBuffer = 3
             self.camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
         else:
             self.cap = cv2.VideoCapture(self.cam_idx)
 
     def run(self):
-        self.setup_camera()
-        self.running = True
-        
         while self.running:
             frame = None
             st = time()
@@ -49,8 +46,6 @@ class CameraThread(QThread):
                     img = grab_result.Array.copy()
                     grab_result.Release()
                     frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
-                    h, w, _ = frame.shape
-
             else:
                 if self.cap is not None:
                     ret, frame = self.cap.read()
