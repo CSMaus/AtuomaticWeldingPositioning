@@ -264,10 +264,11 @@ class CameraGUI(QWidget):
 
         labeled_frame = frame
 
-        rgb_image = cv2.cvtColor(labeled_frame, cv2.COLOR_BGR2RGB)
+        # Camera gives RGB, so no need to convert BGR2RGB
+        rgb_image = labeled_frame  # Already RGB from camera
         h, w, ch = rgb_image.shape
         bytes_per_line = ch * w
-        convert_to_Qt_format = QImage(rgb_image.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy()
+        convert_to_Qt_format = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888).copy()
         self.video_label.setPixmap(QPixmap.fromImage(convert_to_Qt_format).scaled(self.video_label.size(), Qt.AspectRatioMode.KeepAspectRatio))
         # if self.record_checkbox.isChecked():
         #     self.latest_prediction = prediction
@@ -293,5 +294,4 @@ if __name__ == '__main__':
     window = CameraGUI()
     window.resize(800, 800)
     window.show()
-    sys.exit(app.exec())
     sys.exit(app.exec())
