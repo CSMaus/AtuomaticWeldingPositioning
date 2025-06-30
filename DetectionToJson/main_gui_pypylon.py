@@ -16,58 +16,35 @@ from time import time
 
 
 class CameraThread(QThread):
-    frame_ready = pyqtSignal(QImage)  # MUST BE QImage like working code!
+    frame_ready = pyqtSignal(QImage)
 
-    def __init__(self, is_basler=False, cam_idx=0):
+    def __init__(self):
         super().__init__()
-        self.is_basler = is_basler
-        self.cam_idx = cam_idx
-        self.camera = None
-        self.cap = None
+        self.camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
+        self.camera.Open()
+        self.camera.PixelFormat.SetValue("BayerBG8")
+        self.camera.MaxNumBuffer = 3
+        self.camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
         self.running = True
-        
-        # Setup camera in __init__ like the working code
-        if self.is_basler:
-            self.camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
-            self.camera.Open()
-            self.camera.PixelFormat.SetValue("BayerBG8")
-            self.camera.MaxNumBuffer = 3
-            self.camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
-        else:
-            self.cap = cv2.VideoCapture(self.cam_idx)
 
     def run(self):
         while self.running:
             st = time()
-            if self.is_basler and self.camera is not None:
-                grab_result = self.camera.RetrieveResult(1000, pylon.TimeoutHandling_Return)
-                if grab_result and grab_result.GrabSucceeded():
-                    img = grab_result.Array.copy()
-                    grab_result.Release()
-                    frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
-                    h, w, _ = frame.shape
-                    # CREATE QImage IN THREAD like working code!
-                    qimg = QImage(frame.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy()
-                    self.frame_ready.emit(qimg)
-            else:
-                if self.cap is not None:
-                    ret, frame = self.cap.read()
-                    if ret:
-                        h, w, ch = frame.shape
-                        bytes_per_line = ch * w
-                        qimg = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888).copy()
-                        self.frame_ready.emit(qimg)
-
+            grab_result = self.camera.RetrieveResult(1000, pylon.TimeoutHandling_Return)
+            if grab_result and grab_result.GrabSucceeded():
+                img = grab_result.Array.copy()
+                grab_result.Release()
+                frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
+                h, w, _ = frame.shape
+                qimg = QImage(frame.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy()
+                self.frame_ready.emit(qimg)
             ed = time()
-            print("Grab frame took:", ed-st)
+            print("Image grab took:", ed - st)
 
     def stop(self):
         self.running = False
-        if self.is_basler and self.camera is not None:
-            self.camera.StopGrabbing()
-            self.camera.Close()
-        if self.cap is not None:
-            self.cap.release()
+        self.camera.StopGrabbing()
+        self.camera.Close()
         self.wait()
 
 
@@ -211,11 +188,8 @@ class CameraGUI(QWidget):
                 self.dt = 0
                 self.num_iter = 0
         else:
-            cam_idx = self.camera_dropdown.currentData()
-            is_basler = (cam_idx == "basler")
-            
-            self.camera_thread = CameraThread(is_basler=is_basler, cam_idx=cam_idx if not is_basler else 0)
-            self.camera_thread.frame_ready.connect(self.update_frame)
+            self.camera_thread = CameraThread()
+            self.camera_thread.frame_ready.connect(self.update_image)
             self.camera_thread.start()
             self.start_btn.setText("Stop")
 
@@ -234,14 +208,11 @@ class CameraGUI(QWidget):
         self.current_model.predict(np.zeros((640, 640, 3), dtype=np.uint8), verbose=False)
 
 
-    def update_frame(self, qimg):
-        # Now receives QImage like the working code!
+    def update_image(self, qimg):  # MUST BE update_image like working code!
         pixmap = QPixmap.fromImage(qimg)
         self.video_label.setPixmap(pixmap.scaled(self.video_label.size(), Qt.AspectRatioMode.KeepAspectRatio))
         
         # For timing measurement
-        en = time.time()
-        # self.dt += en - st  # Can't measure here without start time
         self.num_iter += 1
 
     def save_json_periodically(self):
