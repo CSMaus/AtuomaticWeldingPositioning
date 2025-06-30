@@ -16,7 +16,7 @@ from time import time
 
 
 class CameraThread(QThread):
-    frame_ready = pyqtSignal(np.ndarray)
+    frame_ready = pyqtSignal(QImage)  # MUST BE QImage like working code!
 
     def __init__(self, is_basler=False, cam_idx=0):
         super().__init__()
@@ -38,7 +38,6 @@ class CameraThread(QThread):
 
     def run(self):
         while self.running:
-            frame = None
             st = time()
             if self.is_basler and self.camera is not None:
                 grab_result = self.camera.RetrieveResult(1000, pylon.TimeoutHandling_Return)
@@ -46,14 +45,18 @@ class CameraThread(QThread):
                     img = grab_result.Array.copy()
                     grab_result.Release()
                     frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
+                    h, w, _ = frame.shape
+                    # CREATE QImage IN THREAD like working code!
+                    qimg = QImage(frame.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy()
+                    self.frame_ready.emit(qimg)
             else:
                 if self.cap is not None:
                     ret, frame = self.cap.read()
-                    if not ret:
-                        continue
-            
-            if frame is not None:
-                self.frame_ready.emit(frame)
+                    if ret:
+                        h, w, ch = frame.shape
+                        bytes_per_line = ch * w
+                        qimg = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888).copy()
+                        self.frame_ready.emit(qimg)
 
             ed = time()
             print("Grab frame took:", ed-st)
@@ -231,45 +234,14 @@ class CameraGUI(QWidget):
         self.current_model.predict(np.zeros((640, 640, 3), dtype=np.uint8), verbose=False)
 
 
-    def update_frame(self, frame):
-        st = time.time()
+    def update_frame(self, qimg):
+        # Now receives QImage like the working code!
+        pixmap = QPixmap.fromImage(qimg)
+        self.video_label.setPixmap(pixmap.scaled(self.video_label.size(), Qt.AspectRatioMode.KeepAspectRatio))
         
-        try:
-            angle = float(self.angle_input.text().strip())
-        except ValueError:
-            angle = 0.0
-        try:
-            width = float(self.width_input.text().strip())
-        except ValueError:
-            width = 0.0
-
-        try:
-            resize_factor = float(self.resize_input.text().strip())
-        except ValueError:
-            resize_factor = 1.0
-
-        model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(old) YOLOv11-rotated45 - best" else get_masks_points_distance
-
-        # prediction = model_func(frame, width, self.current_model, angle, resize_factor=resize_factor)
-        # labeled_frame = draw_masks_points_distance(frame, prediction, angle,
-        #                                            is_draw_masks=self.mask_checkbox.isChecked(),
-        #                                            is_draw_distance=self.distance_checkbox.isChecked(),
-        #                                            is_draw_groove_masks=self.grMask_checkbox.isChecked(),
-        #                                            alpha=self.alpha_slider.value() / 100)
-
-        labeled_frame = frame
-
-        # Camera gives RGB, so no need to convert BGR2RGB
-        rgb_image = labeled_frame  # Already RGB from camera
-        h, w, ch = rgb_image.shape
-        bytes_per_line = ch * w
-        convert_to_Qt_format = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888).copy()
-        self.video_label.setPixmap(QPixmap.fromImage(convert_to_Qt_format).scaled(self.video_label.size(), Qt.AspectRatioMode.KeepAspectRatio))
-        # if self.record_checkbox.isChecked():
-        #     self.latest_prediction = prediction
-
+        # For timing measurement
         en = time.time()
-        self.dt += en - st
+        # self.dt += en - st  # Can't measure here without start time
         self.num_iter += 1
 
     def save_json_periodically(self):
