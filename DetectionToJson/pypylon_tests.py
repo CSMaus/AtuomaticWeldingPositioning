@@ -5,6 +5,7 @@ from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtGui import QImage, QPixmap
 from pypylon import pylon
 import numpy as np
+from time import time
 
 
 class CameraThread(QThread):
@@ -21,6 +22,7 @@ class CameraThread(QThread):
 
     def run(self):
         while self.running:
+            st = time()
             grab_result = self.camera.RetrieveResult(1000, pylon.TimeoutHandling_Return)
             if grab_result and grab_result.GrabSucceeded():
                 img = grab_result.Array.copy()
@@ -29,6 +31,8 @@ class CameraThread(QThread):
                 h, w, _ = frame.shape
                 qimg = QImage(frame.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy()
                 self.frame_ready.emit(qimg)
+            ed  = time()
+            print("Image grab took:", ed - st)
 
     def stop(self):
         self.running = False
