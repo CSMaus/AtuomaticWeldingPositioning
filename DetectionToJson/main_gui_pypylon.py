@@ -16,7 +16,7 @@ from time import time
 
 
 class CameraThread(QThread):
-    frame_ready = pyqtSignal(QImage)
+    frame_ready = pyqtSignal(QImage, np.ndarray)  # Emit both QImage and numpy array
 
     def __init__(self):
         super().__init__()
@@ -37,7 +37,8 @@ class CameraThread(QThread):
                 frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
                 h, w, _ = frame.shape
                 qimg = QImage(frame.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy()
-                self.frame_ready.emit(qimg)
+                # Emit both QImage for display and numpy array for NN processing
+                self.frame_ready.emit(qimg, frame.copy())
             ed = time()
             print("Image grab took:", ed - st)
 
@@ -208,11 +209,52 @@ class CameraGUI(QWidget):
         self.current_model.predict(np.zeros((640, 640, 3), dtype=np.uint8), verbose=False)
 
 
-    def update_image(self, qimg):  # MUST BE update_image like working code!
-        pixmap = QPixmap.fromImage(qimg)
+    def update_image(self, qimg, frame):
+        st = time.time()
+        
+        # Get parameters for NN processing
+        try:
+            angle = float(self.angle_input.text().strip())
+        except ValueError:
+            angle = 0.0
+        try:
+            width = float(self.width_input.text().strip())
+        except ValueError:
+            width = 0.0
+        try:
+            resize_factor = float(self.resize_input.text().strip())
+        except ValueError:
+            resize_factor = 1.0
+
+        # Choose model function based on selection
+        model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(old) YOLOv11-rotated45 - best" else get_masks_points_distance
+
+        # Process with YOLO
+        prediction = model_func(frame, width, self.current_model, angle, resize_factor=resize_factor)
+        
+        # Draw results on frame
+        labeled_frame = draw_masks_points_distance(frame, prediction, angle,
+                                                   is_draw_masks=self.mask_checkbox.isChecked(),
+                                                   is_draw_distance=self.distance_checkbox.isChecked(),
+                                                   is_draw_groove_masks=self.grMask_checkbox.isChecked(),
+                                                   alpha=self.alpha_slider.value() / 100)
+
+        # Convert processed frame to QImage for display
+        h, w, ch = labeled_frame.shape
+        bytes_per_line = ch * w
+        processed_qimg = QImage(labeled_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888).copy()
+        
+        # Display the processed image
+        pixmap = QPixmap.fromImage(processed_qimg)
         self.video_label.setPixmap(pixmap.scaled(self.video_label.size(), Qt.AspectRatioMode.KeepAspectRatio))
         
-        # For timing measurement
+        # Save prediction for JSON recording
+        if self.record_checkbox.isChecked():
+            self.latest_prediction = prediction
+        
+        # Timing measurement
+        en = time.time()
+        self.dt += en - st
         self.num_iter += 1
 
     def save_json_periodically(self):
