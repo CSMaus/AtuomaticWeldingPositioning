@@ -31,6 +31,7 @@ class CameraThread(QThread):
                 h, w, _ = frame.shape
                 qimg = QImage(frame.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy()
                 self.frame_ready.emit(qimg)
+                print(type(frame))
             ed  = time()
             print("Image grab took:", ed - st)
 

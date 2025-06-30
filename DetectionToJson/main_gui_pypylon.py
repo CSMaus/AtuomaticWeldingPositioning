@@ -12,10 +12,11 @@ from helpers import get_masks_points_distance, get_masks_points_distance45, draw
 import sys
 # pypylon for Basler camera
 from pypylon import pylon
+from time import time
 
 
 class CameraThread(QThread):
-    frame_ready = pyqtSignal(np.ndarray)
+    frame_ready = pyqtSignal(np.ndarray)  # QImage)  # np.ndarray)
 
     def __init__(self, is_basler=False, cam_idx=0):
         super().__init__()
@@ -41,21 +42,15 @@ class CameraThread(QThread):
         
         while self.running:
             frame = None
-            
+            st = time()
             if self.is_basler and self.camera is not None:
                 grab_result = self.camera.RetrieveResult(1000, pylon.TimeoutHandling_Return)
                 if grab_result and grab_result.GrabSucceeded():
                     img = grab_result.Array.copy()
                     grab_result.Release()
-                    
-                    if img.ndim == 2:
-                        frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
-                    elif img.ndim == 3 and img.shape[2] == 2:
-                        frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
-                    elif img.ndim == 3 and img.shape[2] == 3:
-                        frame = img
-                    else:
-                        continue
+                    frame = cv2.cvtColor(img, cv2.COLOR_BAYER_BG2RGB)
+                    h, w, _ = frame.shape
+
             else:
                 if self.cap is not None:
                     ret, frame = self.cap.read()
@@ -64,6 +59,9 @@ class CameraThread(QThread):
             
             if frame is not None:
                 self.frame_ready.emit(frame)
+
+            ed = time()
+            print("Grab frame took:", ed-st)
 
     def stop(self):
         self.running = False
@@ -257,22 +255,22 @@ class CameraGUI(QWidget):
 
         model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(old) YOLOv11-rotated45 - best" else get_masks_points_distance
 
-        prediction = model_func(frame, width, self.current_model, angle, resize_factor=resize_factor)
-        labeled_frame = draw_masks_points_distance(frame, prediction, angle,
-                                                   is_draw_masks=self.mask_checkbox.isChecked(),
-                                                   is_draw_distance=self.distance_checkbox.isChecked(),
-                                                   is_draw_groove_masks=self.grMask_checkbox.isChecked(),
-                                                   alpha=self.alpha_slider.value() / 100)
+        # prediction = model_func(frame, width, self.current_model, angle, resize_factor=resize_factor)
+        # labeled_frame = draw_masks_points_distance(frame, prediction, angle,
+        #                                            is_draw_masks=self.mask_checkbox.isChecked(),
+        #                                            is_draw_distance=self.distance_checkbox.isChecked(),
+        #                                            is_draw_groove_masks=self.grMask_checkbox.isChecked(),
+        #                                            alpha=self.alpha_slider.value() / 100)
 
-        # labeled_frame = frame
+        labeled_frame = frame
 
         rgb_image = cv2.cvtColor(labeled_frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_image.shape
         bytes_per_line = ch * w
-        convert_to_Qt_format = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
-        self.video_label.setPixmap(QPixmap.fromImage(convert_to_Qt_format).scaled(self.video_label.width(), self.video_label.height()))
-        if self.record_checkbox.isChecked():
-            self.latest_prediction = prediction
+        convert_to_Qt_format = QImage(rgb_image.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy()
+        self.video_label.setPixmap(QPixmap.fromImage(convert_to_Qt_format).scaled(self.video_label.size(), Qt.AspectRatioMode.KeepAspectRatio))
+        # if self.record_checkbox.isChecked():
+        #     self.latest_prediction = prediction
 
         en = time.time()
         self.dt += en - st
