@@ -210,7 +210,7 @@ class CameraGUI(QWidget):
 
 
     def update_image(self, qimg, frame):
-        st = time.time()
+        st = time()
         
         # Get parameters for NN processing
         try:
@@ -226,20 +226,17 @@ class CameraGUI(QWidget):
         except ValueError:
             resize_factor = 1.0
 
-        # Choose model function based on selection
         model_func = get_masks_points_distance45 if self.model_selector.currentText() == "(old) YOLOv11-rotated45 - best" else get_masks_points_distance
-
-        # Process with YOLO
+#
         prediction = model_func(frame, width, self.current_model, angle, resize_factor=resize_factor)
-        
-        # Draw results on frame
+
         labeled_frame = draw_masks_points_distance(frame, prediction, angle,
                                                    is_draw_masks=self.mask_checkbox.isChecked(),
                                                    is_draw_distance=self.distance_checkbox.isChecked(),
                                                    is_draw_groove_masks=self.grMask_checkbox.isChecked(),
                                                    alpha=self.alpha_slider.value() / 100)
 
-        # Convert processed frame to QImage for display
+        # labeled_frame = frame
         h, w, ch = labeled_frame.shape
         bytes_per_line = ch * w
         processed_qimg = QImage(labeled_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888).copy()
@@ -249,11 +246,11 @@ class CameraGUI(QWidget):
         self.video_label.setPixmap(pixmap.scaled(self.video_label.size(), Qt.AspectRatioMode.KeepAspectRatio))
         
         # Save prediction for JSON recording
-        if self.record_checkbox.isChecked():
-            self.latest_prediction = prediction
+        # if self.record_checkbox.isChecked():
+        #     self.latest_prediction = prediction
         
         # Timing measurement
-        en = time.time()
+        en = time()
         self.dt += en - st
         self.num_iter += 1
 
