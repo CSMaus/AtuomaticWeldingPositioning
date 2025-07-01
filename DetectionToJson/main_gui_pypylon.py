@@ -246,8 +246,8 @@ class CameraGUI(QWidget):
         self.video_label.setPixmap(pixmap.scaled(self.video_label.size(), Qt.AspectRatioMode.KeepAspectRatio))
         
         # Save prediction for JSON recording
-        # if self.record_checkbox.isChecked():
-        #     self.latest_prediction = prediction
+        if self.record_checkbox.isChecked():
+            self.latest_prediction = prediction
         
         # Timing measurement
         en = time()
