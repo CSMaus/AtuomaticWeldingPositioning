@@ -25,3 +25,5 @@ CNN/yolo11n-seg.pt
 DetectionToJson/predictions.json
 *.avi
 *.mp4
+DetectionToJson/SAM2_autolabeling/TEST_POLYGON_PROMPTS.json
+*.json
