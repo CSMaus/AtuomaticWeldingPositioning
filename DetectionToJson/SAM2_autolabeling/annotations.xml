@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8"?>
+<annotations>
+  <version>1.1</version>
+  <meta>
+    <job>
+      <id>2731281</id>
+      <size>44</size>
+      <mode>annotation</mode>
+      <overlap>0</overlap>
+      <bugtracker></bugtracker>
+      <created>2025-07-23 15:14:36.706231+00:00</created>
+      <updated>2025-07-23 15:40:44.973001+00:00</updated>
+      <subset>Train</subset>
+      <start_frame>0</start_frame>
+      <stop_frame>43</stop_frame>
+      <frame_filter></frame_filter>
+      <segments>
+        <segment>
+          <id>2733169</id>
+          <start>0</start>
+          <stop>43</stop>
+          <url>https://app.cvat.ai/api/jobs/2731281</url>
+        </segment>
+      </segments>
+      <owner>
+        <username>kseniia</username>
+        <email>kseniiamaus@gmail.com</email>
+      </owner>
+      <assignee>
+        <username>kseniia</username>
+        <email>kseniiamaus@gmail.com</email>
+      </assignee>
+      <labels>
+        <label>
+          <name>Electrode</name>
+          <color>#fa3253</color>
+          <type>any</type>
+          <attributes>
+          </attributes>
+        </label>
+        <label>
+          <name>LeftEdge</name>
+          <color>#33ddff</color>
+          <type>any</type>
+          <attributes>
+          </attributes>
+        </label>
+        <label>
+          <name>RightEdge</name>
+          <color>#66ff66</color>
+          <type>any</type>
+          <attributes>
+          </attributes>
+        </label>
+        <label>
+          <name>groove center</name>
+          <color>#ddff33</color>
+          <type>any</type>
+          <attributes>
+          </attributes>
+        </label>
+        <label>
+          <name>GrooveBbox</name>
+          <color>#aaf0d1</color>
+          <type>rectangle</type>
+          <attributes>
+          </attributes>
+        </label>
+      </labels>
+    </job>
+    <dumped>2025-07-23 15:41:10.863018+00:00</dumped>
+  </meta>
+  <image id="0" name="basler_recording_20250701_162034-frame_0000.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="795.10,688.00;688.90,692.60;653.70,1068.70;878.70,1144.00;1081.60,1101.30;1099.98,693.60;910.00,685.70;908.14,722.46;861.35,879.98;841.85,879.98;797.00,721.30" z_order="0">
+    </polygon>
+  </image>
+  <image id="1" name="basler_recording_20250701_162034-frame_0001.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="794.82,692.27;686.10,693.80;653.42,1072.97;871.60,1126.20;1074.30,1089.30;1087.30,707.70;908.00,700.90;908.30,724.80;861.06,884.25;841.57,884.25;796.72,725.57" z_order="0">
+    </polygon>
+  </image>
+  <image id="2" name="basler_recording_20250701_162034-frame_0002.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="795.76,692.68;677.70,690.30;641.10,1079.60;859.80,1133.80;1075.25,1089.72;1086.90,703.40;910.40,697.90;909.25,725.22;862.01,884.67;842.51,884.67;797.66,725.98" z_order="0">
+    </polygon>
+  </image>
+  <image id="3" name="basler_recording_20250701_162034-frame_0003.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="794.98,692.58;662.10,696.90;626.80,1073.40;848.50,1144.80;1074.46,1089.62;1086.11,703.30;909.61,697.80;908.80,725.10;861.22,884.57;841.73,884.57;796.20,726.20" z_order="0">
+    </polygon>
+  </image>
+  <image id="4" name="basler_recording_20250701_162034-frame_0004.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="793.70,686.80;601.20,678.80;563.47,1066.62;781.80,1139.40;998.90,1065.40;1010.50,698.90;908.60,695.10;907.80,724.10;861.00,881.10;842.40,879.00;792.50,719.80" z_order="0">
+    </polygon>
+  </image>
+  <image id="5" name="basler_recording_20250701_162308-frame_0000.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="791.18,690.16;594.00,688.90;552.20,1063.20;772.50,1142.80;988.30,1068.80;1001.90,705.60;906.08,698.46;905.28,727.46;858.80,881.90;842.20,879.40;792.20,719.90" z_order="0">
+    </polygon>
+  </image>
+  <image id="6" name="basler_recording_20250701_162308-frame_0001.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="794.80,690.30;616.70,697.70;585.60,1037.70;786.10,1146.10;1002.95,1072.19;1015.20,709.00;910.00,698.60;906.30,726.60;860.10,883.40;841.90,880.80;792.90,718.70" z_order="0">
+    </polygon>
+  </image>
+  <image id="7" name="basler_recording_20250701_162308-frame_0002.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="792.80,694.00;629.00,690.40;598.30,1016.20;808.90,1157.60;1027.80,1075.60;1037.10,701.70;911.00,697.50;907.30,727.40;861.40,887.80;840.30,884.80;794.30,720.90" z_order="0">
+    </polygon>
+  </image>
+  <image id="8" name="basler_recording_20250701_162308-frame_0003.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="793.10,688.70;643.50,683.30;613.80,1011.10;827.30,1152.10;1040.20,1048.60;1051.60,698.70;910.40,695.10;909.27,726.52;864.90,884.40;840.30,884.90;793.10,719.50" z_order="0">
+    </polygon>
+  </image>
+  <image id="9" name="basler_recording_20250701_162308-frame_0004.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="792.50,689.00;676.30,686.80;648.00,1017.20;860.15,1158.23;1071.70,1054.10;1084.45,704.83;910.40,691.50;910.60,723.50;859.70,886.30;841.90,884.90;793.10,719.80" z_order="0">
+    </polygon>
+  </image>
+  <image id="10" name="basler_recording_20250701_162308-frame_0005.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="794.90,673.50;693.10,674.70;664.03,1011.15;876.18,1152.17;1087.73,1048.05;1101.10,679.90;909.80,670.40;910.30,722.50;860.40,877.70;839.70,876.00;796.70,718.10" z_order="0">
+    </polygon>
+  </image>
+  <image id="11" name="basler_recording_20250701_162308-frame_0006.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="796.62,719.96;796.62,669.89;688.69,663.39;696.49,837.65;736.15,897.47;828.48,951.44;935.77,967.70;1036.56,933.89;1110.68,860.41;1119.80,679.00;909.80,675.10;909.11,723.21;857.09,881.87;840.84,878.62" z_order="0">
+    </polygon>
+  </image>
+  <image id="12" name="basler_recording_20250710_092901-frame_0000.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="945.53,681.60;945.53,661.44;847.34,650.39;847.99,853.91;907.81,950.79;1054.11,996.31;1188.71,967.05;1264.79,879.27;1261.54,640.63;1053.46,652.34;1048.26,679.00;997.54,829.20;982.59,824.65" z_order="0">
+    </polygon>
+  </image>
+  <image id="13" name="basler_recording_20250710_092901-frame_0001.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="941.60,678.00;943.00,644.20;848.00,646.10;837.00,856.80;907.83,952.41;1047.60,1001.20;1188.73,968.66;1259.60,880.20;1259.70,642.20;1047.60,644.20;1048.28,680.61;997.60,825.60;982.60,823.70" z_order="0">
+    </polygon>
+  </image>
+  <image id="14" name="basler_recording_20250710_092901-frame_0002.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="940.10,680.50;939.70,657.70;836.20,658.00;824.57,874.04;894.10,949.50;1035.17,1018.44;1174.30,965.10;1247.80,881.20;1247.27,659.44;1049.20,656.60;1047.80,679.80;999.00,824.10;982.70,823.70" z_order="0">
+    </polygon>
+  </image>
+  <image id="15" name="basler_recording_20250710_092901-frame_0003.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="940.60,680.90;939.70,657.40;821.65,659.10;810.00,853.40;869.10,921.90;1020.62,1019.54;1165.00,937.50;1229.80,860.60;1231.00,652.70;1049.10,656.20;1048.80,676.20;999.70,826.60;983.70,824.80" z_order="0">
+    </polygon>
+  </image>
+  <image id="16" name="basler_recording_20250710_092901-frame_0004.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="936.40,677.30;936.00,651.10;790.90,646.80;783.49,843.21;991.53,1011.21;1202.19,891.08;1203.93,649.09;1048.99,649.09;1048.12,678.69;999.37,829.28;981.09,826.67" z_order="0">
+    </polygon>
+  </image>
+  <image id="17" name="basler_recording_20250710_092901-frame_0005.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="937.20,681.30;936.80,655.10;734.30,645.60;722.50,855.00;929.69,1009.94;1140.34,889.81;1141.20,662.60;1049.00,658.30;1048.10,679.20;1000.20,828.90;982.80,827.10" z_order="0">
+    </polygon>
+  </image>
+  <image id="18" name="basler_recording_20250710_092901-frame_0006.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="936.35,680.40;935.95,654.20;721.30,646.40;711.20,854.10;916.60,1020.40;1129.90,888.00;1128.20,666.90;1048.15,657.40;1047.25,678.30;999.35,828.00;981.95,826.20" z_order="0">
+    </polygon>
+  </image>
+  <image id="19" name="basler_recording_20250710_092901-frame_0007.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="661.30,763.50;660.00,727.70;552.40,719.90;541.46,934.61;746.86,1100.91;967.10,946.80;980.20,737.00;775.70,736.20;773.90,770.10;719.10,919.80;700.80,919.80" z_order="0">
+    </polygon>
+  </image>
+  <image id="20" name="basler_recording_20250710_092901-frame_0008.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="659.11,764.40;657.81,728.60;532.80,721.70;519.20,935.50;729.00,1091.40;946.60,946.00;957.10,738.80;773.51,737.10;771.71,771.00;716.91,920.70;698.61,920.70" z_order="0">
+    </polygon>
+  </image>
+  <image id="21" name="basler_recording_20250710_092901-frame_0009.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="658.70,763.90;658.28,728.12;510.60,719.50;496.20,924.60;705.10,1085.70;929.70,943.80;934.90,740.90;773.98,736.62;772.18,770.52;717.38,920.22;699.08,920.22" z_order="0">
+    </polygon>
+  </image>
+  <image id="22" name="basler_recording_20250710_092901-frame_0010.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="658.27,768.25;657.85,732.47;489.30,722.10;470.50,918.50;677.70,1093.50;898.80,956.00;903.10,747.90;773.55,740.97;771.75,774.87;716.95,924.57;698.65,924.57" z_order="0">
+    </polygon>
+  </image>
+  <image id="23" name="basler_recording_20250710_092901-frame_0011.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="805.54,985.82;770.70,840.83;769.00,813.30;667.30,811.60;665.61,964.47;882.53,1163.41;1089.34,999.31;1087.65,793.63;879.72,802.62;871.85,839.15;824.08,989.76" z_order="0">
+    </polygon>
+  </image>
+  <image id="24" name="basler_recording_20250710_092901-frame_0012.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="807.22,986.95;762.80,835.20;761.14,799.81;658.30,799.81;655.49,980.76;870.17,1184.76;1087.65,990.88;1079.22,789.13;878.03,793.06;871.85,835.21;825.21,989.19" z_order="0">
+    </polygon>
+  </image>
+  <image id="25" name="basler_recording_20250710_092901-frame_0013.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="805.82,988.62;763.10,839.70;762.00,816.10;636.10,815.00;634.40,977.40;848.00,1184.20;1064.30,990.90;1061.50,809.30;871.00,811.60;870.45,836.88;823.80,988.10" z_order="0">
+    </polygon>
+  </image>
+  <image id="26" name="basler_recording_20250710_092901-frame_0014.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="806.40,986.90;757.00,833.40;756.70,809.40;611.96,805.74;610.26,968.14;823.86,1174.94;1040.16,981.64;1037.36,800.04;874.10,805.70;872.30,836.90;824.80,986.00" z_order="0">
+    </polygon>
+  </image>
+  <image id="27" name="basler_recording_20250710_092901-frame_0015.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="806.06,990.67;756.66,837.17;756.36,813.17;586.30,810.20;582.60,977.80;796.90,1170.90;1014.50,990.60;1009.70,809.70;873.76,809.47;871.96,840.67;824.46,989.77" z_order="0">
+    </polygon>
+  </image>
+  <image id="28" name="basler_recording_20250710_092901-frame_0016.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="807.01,989.80;757.61,836.30;757.31,812.30;557.30,806.10;553.00,986.70;765.30,1181.10;982.90,996.20;977.50,827.00;873.40,814.50;872.91,839.80;825.41,988.90" z_order="0">
+    </polygon>
+  </image>
+  <image id="29" name="basler_recording_20250710_093535-frame_0000.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="809.92,579.84;769.20,438.60;767.00,410.60;672.95,407.90;671.49,602.66;873.59,793.40;1086.09,643.32;1076.04,407.65;877.62,411.68;873.79,438.79;826.62,581.34" z_order="0">
+    </polygon>
+  </image>
+  <image id="30" name="basler_recording_20250710_093535-frame_0001.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="810.94,581.01;776.70,453.40;769.90,428.00;653.80,422.70;650.40,587.60;852.50,788.10;1065.00,645.80;1058.90,417.90;874.70,425.20;871.60,448.40;827.65,582.51" z_order="0">
+    </polygon>
+  </image>
+  <image id="31" name="basler_recording_20250710_093535-frame_0002.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="809.65,581.01;775.41,453.40;768.60,426.00;630.40,422.70;623.10,587.60;828.50,805.70;1038.30,645.20;1032.20,423.80;873.41,425.20;870.31,448.40;826.36,582.51" z_order="0">
+    </polygon>
+  </image>
+  <image id="32" name="basler_recording_20250710_093535-frame_0003.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="810.00,582.16;769.30,452.60;767.60,425.90;586.50,420.60;578.60,638.20;784.60,828.30;994.40,635.90;992.20,427.60;872.50,427.70;870.66,449.55;826.71,583.67" z_order="0">
+    </polygon>
+  </image>
+  <image id="33" name="basler_recording_20250710_093535-frame_0004.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="809.68,577.62;768.98,448.06;767.28,421.36;561.50,412.80;554.20,628.50;758.30,819.20;968.10,630.70;967.20,431.50;872.18,423.16;870.34,445.01;826.39,579.12" z_order="0">
+    </polygon>
+  </image>
+  <image id="34" name="basler_recording_20250710_093738-frame_0000.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="996.53,842.26;957.67,696.55;956.70,673.24;868.30,672.75;867.33,849.55;977.58,958.35;1074.72,975.35;1212.18,946.21;1290.86,850.04;1285.52,653.81;1067.92,665.95;1062.10,695.58;1014.50,847.12" z_order="0">
+    </polygon>
+  </image>
+  <image id="35" name="basler_recording_20250710_093738-frame_0001.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="995.55,840.32;952.00,692.00;950.40,653.30;850.81,654.78;843.60,873.40;1057.58,1067.68;1276.92,884.91;1269.10,644.63;1062.78,652.50;1063.65,691.65;1012.31,848.34" z_order="0">
+    </polygon>
+  </image>
+  <image id="36" name="basler_recording_20250710_093738-frame_0002.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="995.77,844.81;952.22,696.49;955.10,671.30;827.40,674.40;820.20,874.50;1035.20,1069.90;1250.20,882.10;1244.60,655.90;1064.10,676.70;1063.87,696.14;1015.90,847.80" z_order="0">
+    </polygon>
+  </image>
+  <image id="37" name="basler_recording_20250710_093738-frame_0003.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="996.55,843.52;952.20,695.20;951.30,667.70;807.90,659.60;798.40,855.90;1011.90,1063.30;1227.70,880.10;1224.30,667.40;1065.60,668.60;1064.64,694.85;1016.67,846.51" z_order="0">
+    </polygon>
+  </image>
+  <image id="38" name="basler_recording_20250710_093738-frame_0004.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="996.90,844.44;950.30,695.40;949.40,668.60;783.40,657.50;774.60,863.60;985.20,1078.50;1203.20,867.50;1198.30,667.60;1065.95,669.52;1065.00,695.77;1017.03,847.43" z_order="0">
+    </polygon>
+  </image>
+  <image id="39" name="basler_recording_20250710_093738-frame_0005.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="995.82,844.08;949.22,695.03;948.32,668.23;729.70,657.10;719.40,883.50;930.70,1081.90;1147.20,880.70;1146.80,672.50;1064.88,669.15;1063.92,695.40;1015.95,847.06" z_order="0">
+    </polygon>
+  </image>
+  <image id="40" name="basler_recording_20250710_094057-frame_0000.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="815.60,873.10;770.50,724.80;765.90,687.40;670.60,687.60;661.80,874.10;877.60,1073.30;1086.62,928.49;1087.70,691.70;884.70,693.60;878.40,728.10;832.00,873.00" z_order="0">
+    </polygon>
+  </image>
+  <image id="41" name="basler_recording_20250710_094057-frame_0001.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="815.20,873.40;765.30,720.20;761.60,692.30;621.30,694.50;606.66,885.06;826.54,1065.61;1045.08,918.60;1047.10,704.05;881.40,700.00;877.40,727.30;833.60,875.40" z_order="0">
+    </polygon>
+  </image>
+  <image id="42" name="basler_recording_20250710_094057-frame_0002.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="816.29,873.46;771.00,733.90;763.90,697.60;569.10,681.50;546.60,919.60;759.40,1099.50;977.60,918.70;979.60,715.90;882.49,700.06;878.49,727.36;834.69,875.46" z_order="0">
+    </polygon>
+  </image>
+  <image id="43" name="basler_recording_20250710_094057-frame_0003.png" width="1624" height="1234">
+    <polygon label="groove center" source="manual" occluded="0" points="814.80,870.30;766.90,727.90;762.90,698.90;548.10,692.80;528.90,918.60;746.21,1110.16;964.41,929.36;966.20,719.50;880.60,713.50;875.80,731.70;832.00,872.80" z_order="0">
+    </polygon>
+  </image>
+</annotations>
