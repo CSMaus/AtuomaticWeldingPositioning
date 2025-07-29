@@ -152,54 +152,63 @@ def process_video_with_corrected_annotations(video_name, max_frames=None):
                          points=prompt_points, 
                          labels=[1] * len(prompt_points))
             
+            frame_annotations = []
+            
             if results and len(results) > 0:
-                result = results[0]
-                if hasattr(result, 'masks') and result.masks is not None:
-                    mask = result.masks.data[0].cpu().numpy()
-                    
-                    mask_uint8 = (mask * 255).astype(np.uint8)
-                    contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    
-                    if contours:
-                        largest_contour = max(contours, key=cv2.contourArea)
-                        epsilon = 0.002 * cv2.arcLength(largest_contour, True)
-                        simplified = cv2.approxPolyDP(largest_contour, epsilon, True)
-                        
-                        polygon = []
-                        for point in simplified:
-                            x, y = point[0]
-                            polygon.append([float(x), float(y)])
-                        
-                        if len(polygon) >= 3:
-                            annotation = {
-                                'frame': frame_idx,
-                                'polygon_points': polygon,
-                                'reference_polygon': reference_polygon if frame_idx == first_frame_idx else None,
-                                'prompt_points_used': prompt_points,
-                                'mask_area': int(np.sum(mask)),
-                                'is_reference_frame': frame_idx in polygons,
-                                'original_annotation': polygons.get(frame_idx, None)
-                            }
-                            annotations.append(annotation)
-                            processed_count += 1
-                            
-                            data['annotations'] = annotations
-                            data['total_frames_processed'] = len(existing_frames) + processed_count
-                            data['successful_annotations'] = len(annotations)
-                            
-                            if processed_count % 10 == 0:
-                                save_annotations_incrementally(data, output_file)
-                                print(f"  Saved progress: {processed_count} new annotations")
-                            
-                            print(f"  Frame {frame_idx}: Got polygon with {len(polygon)} points")
-                        else:
-                            print(f"  Frame {frame_idx}: Polygon too small")
-                    else:
-                        print(f"  Frame {frame_idx}: No contours")
-                else:
-                    print(f"  Frame {frame_idx}: No masks")
+                for result_idx, result in enumerate(results):
+                    if hasattr(result, 'masks') and result.masks is not None:
+                        if result.masks.data is not None and len(result.masks.data) > 0:
+                            for mask_idx, mask in enumerate(result.masks.data):
+                                mask_np = mask.cpu().numpy()
+                                
+                                mask_uint8 = (mask_np * 255).astype(np.uint8)
+                                contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                                
+                                if contours:
+                                    largest_contour = max(contours, key=cv2.contourArea)
+                                    epsilon = 0.002 * cv2.arcLength(largest_contour, True)
+                                    simplified = cv2.approxPolyDP(largest_contour, epsilon, True)
+                                    
+                                    polygon = []
+                                    for point in simplified:
+                                        x, y = point[0]
+                                        polygon.append([float(x), float(y)])
+                                    
+                                    if len(polygon) >= 3:
+                                        annotation = {
+                                            'result_index': result_idx,
+                                            'mask_index': mask_idx,
+                                            'polygon_points': polygon,
+                                            'mask_area': int(np.sum(mask_np)),
+                                            'polygon_points_count': len(polygon)
+                                        }
+                                        frame_annotations.append(annotation)
+            
+            if frame_annotations:
+                frame_data = {
+                    'frame': frame_idx,
+                    'annotations': frame_annotations,
+                    'total_annotations': len(frame_annotations),
+                    'reference_polygon': reference_polygon if frame_idx == first_frame_idx else None,
+                    'prompt_points_used': prompt_points,
+                    'is_reference_frame': frame_idx in polygons,
+                    'original_annotation': polygons.get(frame_idx, None)
+                }
+                
+                annotations.append(frame_data)
+                processed_count += 1
+                
+                data['annotations'] = annotations
+                data['total_frames_processed'] = len(existing_frames) + processed_count
+                data['successful_annotations'] = len(annotations)
+                
+                if processed_count % 10 == 0:
+                    save_annotations_incrementally(data, output_file)
+                    print(f"  Saved progress: {processed_count} new annotations")
+                
+                print(f"  Frame {frame_idx}: Got {len(frame_annotations)} annotations")
             else:
-                print(f"  Frame {frame_idx}: No results")
+                print(f"  Frame {frame_idx}: No valid annotations")
                 
         except Exception as e:
             print(f"  Frame {frame_idx}: Error - {e}")

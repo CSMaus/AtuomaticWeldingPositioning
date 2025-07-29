@@ -42,25 +42,26 @@ def draw_polygon(frame, polygon_points, color=(0, 255, 0), thickness=2):
     
     return frame
 
-def draw_reference_info(frame, annotation, frame_idx):
+def draw_reference_info(frame, frame_data, frame_idx):
     text_y = 30
     
     cv2.putText(frame, f"Frame: {frame_idx}", (10, text_y), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
     text_y += 25
     
-    if annotation.get('is_reference_frame', False):
+    if frame_data.get('is_reference_frame', False):
         cv2.putText(frame, "REFERENCE FRAME", (10, text_y), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
         text_y += 25
     
-    if 'mask_area' in annotation:
-        cv2.putText(frame, f"Mask Area: {annotation['mask_area']}", (10, text_y), 
+    if 'total_annotations' in frame_data:
+        cv2.putText(frame, f"Annotations: {frame_data['total_annotations']}", (10, text_y), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         text_y += 25
     
-    if 'polygon_points' in annotation:
-        cv2.putText(frame, f"Polygon Points: {len(annotation['polygon_points'])}", (10, text_y), 
+    if 'annotations' in frame_data:
+        total_area = sum(ann.get('mask_area', 0) for ann in frame_data['annotations'])
+        cv2.putText(frame, f"Total Mask Area: {total_area}", (10, text_y), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
     
     return frame
@@ -110,16 +111,21 @@ def visualize_sam2_annotations(video_name):
         frame_copy = frame.copy()
         
         if current_frame in annotations:
-            annotation = annotations[current_frame]
+            frame_data = annotations[current_frame]
             
-            if show_reference_only and not annotation.get('is_reference_frame', False):
+            if show_reference_only and not frame_data.get('is_reference_frame', False):
                 pass
             else:
-                if 'polygon_points' in annotation:
-                    color = (0, 255, 255) if annotation.get('is_reference_frame', False) else (0, 255, 0)
-                    frame_copy = draw_polygon(frame_copy, annotation['polygon_points'], color)
+                if 'annotations' in frame_data:
+                    for i, annotation in enumerate(frame_data['annotations']):
+                        if 'polygon_points' in annotation:
+                            colors = [(0, 255, 0), (255, 0, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
+                            color = colors[i % len(colors)]
+                            if frame_data.get('is_reference_frame', False):
+                                color = (0, 255, 255)
+                            frame_copy = draw_polygon(frame_copy, annotation['polygon_points'], color)
                 
-                frame_copy = draw_reference_info(frame_copy, annotation, current_frame)
+                frame_copy = draw_reference_info(frame_copy, frame_data, current_frame)
         else:
             cv2.putText(frame_copy, f"Frame: {current_frame} (No annotation)", (10, 30), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
