@@ -27,3 +27,4 @@ DetectionToJson/predictions.json
 *.mp4
 DetectionToJson/SAM2_autolabeling/TEST_POLYGON_PROMPTS.json
 *.json
+*.xml
