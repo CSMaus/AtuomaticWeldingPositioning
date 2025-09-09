@@ -11,18 +11,25 @@ def train_yolo_segmentation():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     dataset_path = os.path.join(script_dir, 'dataset')
     
+    # Create dynamic YAML content
+    yaml_content = f"""path: {dataset_path}
+train: images/train
+val: images/val
+
+nc: 1
+names: ['grove_n_wrod']"""
+    
+    # Write temporary YAML file
+    yaml_path = os.path.join(script_dir, 'temp_config.yaml')
+    with open(yaml_path, 'w') as f:
+        f.write(yaml_content)
+    
     # Load pretrained model
     model = YOLO('yolo11s-seg.pt')
     
     # Train the model
     results = model.train(
-        data={
-            'path': dataset_path,
-            'train': 'images/train',
-            'val': 'images/val',
-            'nc': 1,
-            'names': ['grove_n_wrod']
-        },
+        data=yaml_path,
         epochs=20,
         imgsz=640,
         batch=8,
