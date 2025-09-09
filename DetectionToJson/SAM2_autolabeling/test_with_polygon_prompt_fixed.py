@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Use your EXACT polygons as prompts to get IDENTICAL results
-Resumes from existing annotations and skips already processed frames
+FIXED: Use closest reference annotation for each frame (but never the same frame)
 """
 
 import os
@@ -13,8 +12,8 @@ from ultralytics import SAM
 
 TOTAL_FRAMES_TO_PROCESS = 10
 
-def get_your_exact_polygons():
-    """Get YOUR exact polygons from XML"""
+def get_your_exact_polygons_with_frames():
+    """Get YOUR exact polygons from XML with frame numbers"""
     xml_path = "/Users/kseni/Documents/GitHub/AtuomaticWeldingPositioning/DetectionToJson/SAM2_autolabeling/annotations.xml"
     tree = ET.parse(xml_path)
     root = tree.getroot()
@@ -31,10 +30,34 @@ def get_your_exact_polygons():
                         x, y = map(float, point_str.split(','))
                         polygon_points.append([x, y])
                     
-                    polygons[filename] = polygon_points
+                    # Extract frame number from filename
+                    frame_num = int(filename.split('-frame_')[1].split('.')[0])
+                    polygons[frame_num] = {
+                        'filename': filename,
+                        'polygon': polygon_points
+                    }
                     break
     
     return polygons
+
+def get_closest_reference_for_frame(frame_idx, all_polygons):
+    """Get the closest reference annotation (but NOT the same frame)"""
+    if not all_polygons:
+        return None, None
+    
+    annotated_frames = list(all_polygons.keys())
+    
+    # Remove the current frame from candidates (can't use it to annotate itself!)
+    available_frames = [f for f in annotated_frames if f != frame_idx]
+    
+    if not available_frames:
+        # If no other frames available, use the first one
+        closest_frame = annotated_frames[0]
+    else:
+        # Find closest frame
+        closest_frame = min(available_frames, key=lambda x: abs(x - frame_idx))
+    
+    return all_polygons[closest_frame]['polygon'], closest_frame
 
 def load_existing_annotations(output_file):
     """Load existing annotations if file exists"""
@@ -69,25 +92,16 @@ def save_annotations_incrementally(data, output_file):
     with open(output_file, 'w') as f:
         json.dump(data, f, indent=2)
 
-def test_with_your_polygons():
-    """Test using YOUR polygons as reference with resume capability"""
+def test_with_closest_polygons():
+    """Test using closest reference polygon for each frame"""
     
-    your_polygons = get_your_exact_polygons()
+    your_polygons = get_your_exact_polygons_with_frames()
     if not your_polygons:
         print("No polygons found!")
         return
     
-    print(f"Found {len(your_polygons)} of your polygons")
-    
-    first_file = list(your_polygons.keys())[0]
-    reference_polygon = your_polygons[first_file]
-    
-    print(f"Using reference polygon from: {first_file}")
-    print(f"Polygon has {len(reference_polygon)} points")
-    
-    prompt_points = get_multiple_points_from_polygon(reference_polygon, num_points=8)
-    
-    print(f"Using {len(prompt_points)} prompt points from your polygon")
+    annotated_frames = sorted(your_polygons.keys())
+    print(f"Found {len(your_polygons)} reference annotations at frames: {annotated_frames}")
     
     video_path = "/Users/kseni/Documents/GitHub/AtuomaticWeldingPositioning/DetectionToJson/SAM2_autolabeling/basler_recordings/basler_recording_20250710_092901.avi"
     video_name = os.path.basename(video_path).replace('.avi', '')
@@ -105,12 +119,10 @@ def test_with_your_polygons():
         existing_frames = set()
     
     data = {
-        'method': 'multiple_points_from_your_polygon',
+        'method': 'closest_reference_polygon',
         'video_name': video_name,
         'video_path': video_path,
-        'reference_file': first_file,
-        'reference_polygon': reference_polygon,
-        'prompt_points': prompt_points,
+        'reference_frames': annotated_frames,
         'total_frames_to_process': TOTAL_FRAMES_TO_PROCESS,
         'total_frames_processed': len(existing_frames),
         'successful_annotations': len(annotations),
@@ -127,10 +139,10 @@ def test_with_your_polygons():
         print(f"✅ All {TOTAL_FRAMES_TO_PROCESS} frames already processed!")
         return
     
-    print(f"Need to process {len(frames_to_process)} more frames: {frames_to_process[:10]}{'...' if len(frames_to_process) > 10 else ''}")
+    print(f"Need to process {len(frames_to_process)} more frames")
     
     # Initialize SAM2
-    sam = SAM("sam2.1_l.pt")
+    sam = SAM("sam2_b.pt")
     
     # Open video
     cap = cv2.VideoCapture(video_path)
@@ -150,12 +162,21 @@ def test_with_your_polygons():
             print(f"Cannot read frame {frame_idx}, stopping")
             break
         
-        print(f"Processing frame {frame_idx}... ({processed_count + 1}/{len(frames_to_process)})")
+        # Get the closest reference polygon for THIS frame
+        reference_polygon, reference_frame = get_closest_reference_for_frame(frame_idx, your_polygons)
+        if reference_polygon is None:
+            print(f"  ❌ Frame {frame_idx}: No reference polygon")
+            continue
+        
+        # Get prompt points from the closest reference
+        prompt_points = get_multiple_points_from_polygon(reference_polygon, num_points=8)
+        
+        print(f"Processing frame {frame_idx}... using reference frame {reference_frame} ({processed_count + 1}/{len(frames_to_process)})")
         
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
         try:
-            # Use multiple points from your polygon as prompts
+            # Use points from the closest reference polygon
             results = sam(frame_rgb, 
                          points=prompt_points, 
                          labels=[1] * len(prompt_points))  # All positive
@@ -183,7 +204,8 @@ def test_with_your_polygons():
                             annotation = {
                                 'frame': frame_idx,
                                 'polygon_points': polygon,
-                                'your_reference_polygon': reference_polygon,
+                                'reference_frame': reference_frame,
+                                'reference_polygon': reference_polygon,
                                 'prompt_points_used': prompt_points,
                                 'mask_area': int(np.sum(mask))
                             }
@@ -200,7 +222,7 @@ def test_with_your_polygons():
                                 save_annotations_incrementally(data, output_file)
                                 print(f"  💾 Saved progress: {processed_count} new annotations")
                             
-                            print(f"  ✅ Frame {frame_idx}: Got polygon with {len(polygon)} points")
+                            print(f"  ✅ Frame {frame_idx}: Got polygon with {len(polygon)} points (ref: {reference_frame})")
                         else:
                             print(f"  ❌ Frame {frame_idx}: Polygon too small")
                     else:
@@ -230,11 +252,12 @@ def test_with_your_polygons():
     print(f"\n🎉 PROCESSING COMPLETE!")
     print(f"   - New annotations: {processed_count}")
     print(f"   - Total annotations: {len(annotations)}")
+    print(f"   - Reference frames: {annotated_frames}")
     print(f"   - Saved to: {output_file}")
     print(f"   - Video: {video_name}")
 
 if __name__ == "__main__":
-    print("=== TESTING WITH YOUR EXACT POLYGONS AS PROMPTS (RESUME CAPABLE) ===")
+    print("=== USING CLOSEST REFERENCE ANNOTATIONS (FIXED) ===")
     print(f"Configured to process {TOTAL_FRAMES_TO_PROCESS} total frames")
-    print("Will skip frames that already have annotations")
-    test_with_your_polygons()
+    print("Uses closest reference frame for each processed frame")
+    test_with_closest_polygons()

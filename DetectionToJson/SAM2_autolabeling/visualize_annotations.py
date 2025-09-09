@@ -10,24 +10,26 @@ import numpy as np
 import os
 
 # CONFIGURATION - Change this to set how many frames to show
-MAX_FRAMES_TO_SHOW = 100  # Change this number as needed
+MAX_FRAMES_TO_SHOW = 10
 
 def load_annotations():
     """Load the saved test annotations"""
-    # Try to load the polygon prompts test first
+    # ONLY load the improved polygon prompts file
     json_file = "/Users/kseni/Documents/GitHub/AtuomaticWeldingPositioning/DetectionToJson/SAM2_autolabeling/TEST_POLYGON_PROMPTS.json"
     
     if not os.path.exists(json_file):
-        # Fallback to the original test file
-        json_file = "/Users/kseni/Documents/GitHub/AtuomaticWeldingPositioning/DetectionToJson/SAM2_autolabeling/TEST_10_FRAMES_ANNOTATIONS.json"
-        
-        if not os.path.exists(json_file):
-            print(f"No annotation files found!")
-            print("Run test_with_polygon_prompt.py first!")
-            return None
+        print(f"TEST_POLYGON_PROMPTS.json not found!")
+        print("Run test_with_polygon_prompt_improved.py first!")
+        return None
     
     with open(json_file, 'r') as f:
         data = json.load(f)
+    
+    print(f"Loaded annotations from: TEST_POLYGON_PROMPTS.json")
+    print(f"Found {data['successful_annotations']} annotations")
+    print(f"Method: {data.get('method', 'unknown')}")
+    print(f"Will show up to {MAX_FRAMES_TO_SHOW} frames")
+    return data
     
     print(f"Loaded annotations from: {json_file}")
     print(f"Found {data['successful_annotations']} annotations from {data['total_frames_processed']} frames")

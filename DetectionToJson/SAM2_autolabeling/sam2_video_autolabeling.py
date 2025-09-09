@@ -408,7 +408,7 @@ def main():
     OUTPUT_FOLDER = os.path.join(BASE_DIR, "sam2_video_annotations")
     
     # SAM2 model - you can change this to sam2_l.pt for better accuracy
-    SAM_MODEL = "sam2_b.pt"
+    SAM_MODEL = "sam2.1_b.pt"
     
     print("=== SAM2 Video Auto-labeling ===")
     print(f"Videos folder: {VIDEOS_FOLDER}")
