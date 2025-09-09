@@ -28,3 +28,6 @@ DetectionToJson/predictions.json
 DetectionToJson/SAM2_autolabeling/TEST_POLYGON_PROMPTS.json
 *.json
 *.xml
+/yolo_0909/runs/segment/weld_seg_09092
+/yolo_0909/dataset
+/yolo_0909/runs/segment
