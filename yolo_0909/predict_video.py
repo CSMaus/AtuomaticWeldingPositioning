@@ -25,7 +25,7 @@ def predict_video():
     video_path = os.path.join(videos_dir, videos[idx])
     
     # Load model
-    model_path = os.path.join(script_dir, "runs", "segment", "weld_seg_0909", "weights", "best.pt")
+    model_path = os.path.join(script_dir, "runs", "segment", "weld_seg_09093", "weights", "best.pt")
     if not os.path.exists(model_path):
         print("Trained model not found! Train first.")
         return
@@ -64,7 +64,13 @@ def predict_video():
             cv2.putText(annotated_frame, f'FPS: {fps:.1f}', (10, 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             
-            cv2.imshow('YOLO Real-time Prediction', annotated_frame)
+            # Resize window to make it smaller
+            height, width = annotated_frame.shape[:2]
+            new_width = int(width * 0.6)
+            new_height = int(height * 0.6)
+            resized_frame = cv2.resize(annotated_frame, (new_width, new_height))
+            
+            cv2.imshow('YOLO Real-time Prediction', resized_frame)
     
     cap.release()
     cv2.destroyAllWindows()
