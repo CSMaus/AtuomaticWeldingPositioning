@@ -1,0 +1,6 @@
+path: /Users/kseni/Documents/GitHub/AtuomaticWeldingPositioning/yolo_0909/dataset
+train: images/train
+val: images/val
+
+nc: 1
+names: ['grove_n_wrod']
