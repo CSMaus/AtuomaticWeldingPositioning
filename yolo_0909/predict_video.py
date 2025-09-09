@@ -1,6 +1,7 @@
 import cv2
 import os
 from ultralytics import YOLO
+import time
 
 def predict_video():
     # Get paths
@@ -23,7 +24,7 @@ def predict_video():
     idx = int(input("Enter video index: "))
     video_path = os.path.join(videos_dir, videos[idx])
     
-    # Load model (use best trained model)
+    # Load model
     model_path = os.path.join(script_dir, "runs", "segment", "weld_seg_0909", "weights", "best.pt")
     if not os.path.exists(model_path):
         print("Trained model not found! Train first.")
@@ -34,30 +35,44 @@ def predict_video():
     # Open video
     cap = cv2.VideoCapture(video_path)
     paused = False
+    fps_list = []
     
     while True:
-        if not paused:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            # Predict
-            results = model(frame)
-            
-            # Draw results
-            annotated_frame = results[0].plot()
-            
-            cv2.imshow('YOLO Prediction', annotated_frame)
-        
         key = cv2.waitKey(1) & 0xFF
         
         if key == ord('q') or key == 27:  # q or ESC
             break
         elif key == ord(' '):  # Space
             paused = not paused
+        
+        if not paused:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            # Real-time prediction and display
+            start_time = time.time()
+            results = model(frame, verbose=False)
+            inference_time = time.time() - start_time
+            
+            # Calculate FPS
+            fps = 1.0 / inference_time
+            fps_list.append(fps)
+            
+            # Draw results with FPS
+            annotated_frame = results[0].plot()
+            cv2.putText(annotated_frame, f'FPS: {fps:.1f}', (10, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
+            cv2.imshow('YOLO Real-time Prediction', annotated_frame)
     
     cap.release()
     cv2.destroyAllWindows()
+    
+    # Print average FPS
+    if fps_list:
+        avg_fps = sum(fps_list) / len(fps_list)
+        print(f"Average FPS: {avg_fps:.2f}")
 
 if __name__ == "__main__":
     predict_video()
