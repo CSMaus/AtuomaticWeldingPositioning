@@ -12,19 +12,19 @@ def train_yolo_segmentation():
     yaml_path = os.path.join(script_dir, 'weld_seg.yaml')
     
     # Load pretrained model
-    model = YOLO('yolo11n-seg.pt')
+    model = YOLO('yolo11s-seg.pt')
     
     # Train the model
     results = model.train(
         data=yaml_path,
-        epochs=100,
+        epochs=20,
         imgsz=640,
-        batch=16,
+        batch=8,
         device=device,
         project=os.path.join(script_dir, 'runs/segment'),
         name='weld_seg_0909',
         save=True,
-        save_period=10,
+        save_period=4,
         patience=20,
         verbose=True
     )
