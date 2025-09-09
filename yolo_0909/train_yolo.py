@@ -9,14 +9,20 @@ def train_yolo_segmentation():
     
     # Get paths
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    yaml_path = os.path.join(script_dir, 'weld_seg.yaml')
+    dataset_path = os.path.join(script_dir, 'dataset')
     
     # Load pretrained model
     model = YOLO('yolo11s-seg.pt')
     
     # Train the model
     results = model.train(
-        data=yaml_path,
+        data={
+            'path': dataset_path,
+            'train': 'images/train',
+            'val': 'images/val',
+            'nc': 1,
+            'names': ['grove_n_wrod']
+        },
         epochs=20,
         imgsz=640,
         batch=8,
