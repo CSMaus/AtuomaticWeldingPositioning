@@ -112,8 +112,8 @@ def predict_video():
     paused = False
     fps_list = []
 
-    records = []                   # collected records
-    next_record_ms = 0.0           # next timestamp (ms) to save
+    record = {}
+    next_record_ms = 0.0
 
     while True:
         key = cv2.waitKey(1) & 0xFF
@@ -202,11 +202,11 @@ def predict_video():
         cv2.putText(vis, f'FPS: {fps:.1f}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,(0,255,0),2)
         cv2.imshow("YOLO Real-time Prediction", cv2.resize(vis, None, fx=1, fy=1))  # fx=0.6, fy=0.6
 
-        # ---- periodic JSON recording ----
+        # ---- periodic JSON update ----
         cur_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
         if cur_ms >= next_record_ms:
-            record = {
-                "timestamp_ms": float(cur_ms),
+            record.update({
+                "timestamp_ms": float(cur_ms),  # optional: can keep or remove if you don’t want timestamp
                 "mm_per_px": float(mm_per_px) if mm_per_px is not None else None,
                 "electrode_center_px": list(electrode_center) if electrode_center else None,
                 "electrode_bbox_px": list(ebox[:4]) if ebox else None,
@@ -217,9 +217,14 @@ def predict_video():
                 "center_to_right_mm": float(center_to_right_mm) if center_to_right_mm is not None else None,
                 "clearance_left_mm": float(clearance_left_mm) if clearance_left_mm is not None else None,
                 "clearance_right_mm": float(clearance_right_mm) if clearance_right_mm is not None else None,
-            }
-            records.append(record)
-            # advance to next tick (if we skipped multiple intervals, catch up)
+            })
+            # overwrite JSON file each update
+            try:
+                with open(OUTPUT_JSON_PATH, "w", encoding="utf-8") as f:
+                    json.dump(record, f, indent=2)
+            except Exception as e:
+                print("Failed to write JSON:", e)
+
             while next_record_ms <= cur_ms:
                 next_record_ms += RECORD_EVERY_MS
 
@@ -231,12 +236,12 @@ def predict_video():
         print(f"Average FPS: {sum(fps_list)/len(fps_list):.2f}")
 
     # Save JSON (list of dicts)
-    try:
-        with open(OUTPUT_JSON_PATH, "w", encoding="utf-8") as f:
-            json.dump(records, f, indent=2)
-        print(f"Saved {len(records)} records to {OUTPUT_JSON_PATH}")
-    except Exception as e:
-        print("Failed to write JSON:", e)
+    # try:
+    #     with open(OUTPUT_JSON_PATH, "w", encoding="utf-8") as f:
+    #         json.dump(records, f, indent=2)
+    #     print(f"Saved {len(records)} records to {OUTPUT_JSON_PATH}")
+    # except Exception as e:
+    #     print("Failed to write JSON:", e)
 
 if __name__ == "__main__":
     predict_video()
