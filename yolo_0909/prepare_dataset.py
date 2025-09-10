@@ -57,7 +57,8 @@ def prepare_yolo_dataset():
     # Process each annotation file
     annotation_files = [
         ("annotations-basler_recordings_frames.xml", "basler_recordings_frames"),
-        ("annotations-br_frames-0909.xml", "br_frames-0909")
+        ("annotations-br_frames-0909.xml", "br_frames-0909"),
+        ("annotations-labeling data-0910.xml", "labeling data-0910")
     ]
     
     all_images = []

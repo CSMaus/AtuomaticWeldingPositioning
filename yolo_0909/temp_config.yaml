@@ -1,4 +1,4 @@
-path: C:\Users\oem\Documents\GitHub\AtuomaticWeldingPositioning\yolo_0909\dataset
+path: D:\My\projects\!playing_stuff\Doosan\AtuomaticWeldingPositioning\yolo_0909\dataset
 train: images/train
 val: images/val
 
