@@ -2,5 +2,5 @@ path: D:\My\projects\!playing_stuff\Doosan\AtuomaticWeldingPositioning\yolo_0909
 train: images/train
 val: images/val
 
-nc: 1
-names: ['grove_n_wrod']
+nc: 2
+names: ['grove', 'wrod']

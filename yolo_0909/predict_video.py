@@ -21,7 +21,7 @@ def predict_video():
     idx = int(input("Enter video index: "))
     video_path = os.path.join(videos_dir, videos[idx])
     
-    model_path = os.path.join(script_dir, "runs", "segment", "weld_seg_09103", "weights", "best.pt")
+    model_path = os.path.join(script_dir, "runs", "segment", "weld_seg_0910_1-", "weights", "best.pt")
     if not os.path.exists(model_path):
         print("Trained model not found! Train first.")
         return

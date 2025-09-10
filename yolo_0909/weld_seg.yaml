@@ -2,5 +2,5 @@ path: /Users/kseni/Documents/GitHub/AtuomaticWeldingPositioning/yolo_0909/datase
 train: images/train
 val: images/val
 
-nc: 1
-names: ['grove_n_wrod']
+nc: 2
+names: ['grove', "wrod"]

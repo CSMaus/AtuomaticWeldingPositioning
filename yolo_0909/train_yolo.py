@@ -13,8 +13,8 @@ def train_yolo_segmentation():
 train: images/train
 val: images/val
 
-nc: 1
-names: ['grove_n_wrod']"""
+nc: 2
+names: ['grove', 'wrod']"""
     
     yaml_path = os.path.join(script_dir, 'temp_config.yaml')
     with open(yaml_path, 'w') as f:
@@ -29,7 +29,7 @@ names: ['grove_n_wrod']"""
         batch=8,
         device=device,
         project=os.path.join(script_dir, 'runs/segment'),
-        name='weld_seg_0910',
+        name='weld_seg_0910_1-',
         save=True,
         save_period=4,
         patience=20,
