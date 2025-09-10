@@ -32,3 +32,4 @@ DetectionToJson/SAM2_autolabeling/TEST_POLYGON_PROMPTS.json
 /yolo_0909/dataset
 /yolo_0909/runs/segment
 yolo_0909/temp_config.yaml
+yolo_0909/predict_video_all.py

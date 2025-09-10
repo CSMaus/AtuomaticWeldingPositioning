@@ -1,21 +1,22 @@
 import os, time, json, cv2, numpy as np
 from ultralytics import YOLO
 
-# ================= TOGGLES =================
-DRAW_MASK_AND_BBOX    = True
-DRAW_DISTANCE_TEXT    = True
+
+# PARAMS
+DRAW_MASK_AND_BBOX = True
+DRAW_DISTANCE_TEXT = True
 USE_GROOVE_BBOX_FOR_EDGES = False
-SCALE_MM_PER_PX_MANUAL = None    # e.g., 0.015 mm/px; None -> auto from bbox width
-ELECTRODE_DIAMETER_MM  = 4.0     # rod diameter (mm)
-RECORD_EVERY_MS        = 500     # save cadence (ms)
-OUTPUT_JSON_PATH       = "measurements.json"  # saved as a list of dicts
+SCALE_MM_PER_PX_MANUAL = None
+ELECTRODE_DIAMETER_MM  = 4.0
+RECORD_EVERY_MS = 500
+OUTPUT_JSON_PATH = "measurements.json"
 
 CLASS_GROOVE = 0
 CLASS_WROD   = 1
 
-# ================= HELPERS =================
+
 def bbox_from_mask(bin_mask):
-    """Return (x1,y1,x2,y2) bbox from binary mask or None."""
+
     if bin_mask is None or bin_mask.sum() == 0:
         return None
     ys, xs = np.where(bin_mask > 0)
@@ -33,15 +34,14 @@ def groove_edges_at_y(cy, groove_mask, groove_bbox, use_bbox, search=6):
         gx1, gy1, gx2, gy2 = groove_bbox
         y_used = int(np.clip(cy, gy1, gy2))
         return int(gx1), int(gx2), y_used
-    # segmentation mask path
     return edge_xs_at_y_with_fallback(groove_mask, cy, search=search)
 
 def resize_masks_to_frame(res, H, W):
     """Return list of (cls_id, mask_uint8) resized to frame size."""
     if res.masks is None:
         return []
-    raw_masks = res.masks.data.cpu().numpy()        # (N, h, w) in [0,1]
-    cls_ids   = res.boxes.cls.cpu().numpy().astype(int)  # (N,)
+    raw_masks = res.masks.data.cpu().numpy()
+    cls_ids   = res.boxes.cls.cpu().numpy().astype(int)
     out = []
     for m, cls_id in zip(raw_masks, cls_ids):
         m8 = (m * 255).astype(np.uint8)
@@ -90,7 +90,7 @@ def draw_hline_with_text(img, y, x1, x2, txt=None, color=(0,255,0), thickness=2)
         midx = (x1 + x2) // 2
         cv2.putText(img, txt, (midx, y - 6), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 2, cv2.LINE_AA)
 
-# ================= MAIN =================
+
 def predict_video():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(script_dir)
@@ -130,22 +130,18 @@ def predict_video():
         fps = 1.0 / max(1e-6, time.time() - t0)
         fps_list.append(fps)
 
-        # Optional overlay
         vis = frame.copy()
         if DRAW_MASK_AND_BBOX:
             vis = cv2.addWeighted(vis, 0.6, res.plot(), 0.4, 0)
 
-        # ---- Parse groove mask (class 0) ----
         masks = resize_masks_to_frame(res, H, W)
         groove_masks = [m for (cls_id, m) in masks if cls_id == CLASS_GROOVE]
         groove_mask = pick_largest_mask(groove_masks)
         groove_bbox = bbox_from_mask(groove_mask)
 
-        # ---- Parse electrode bbox (class 1) and center ----
         ebox = best_electrode_bbox(res)  # (x1,y1,x2,y2,conf) or None
         electrode_center = None
         mm_per_px = SCALE_MM_PER_PX_MANUAL
-        width_px_electrode = None
         if ebox is not None:
             x1,y1,x2,y2,_ = ebox
             cx = (x1 + x2) // 2
@@ -155,8 +151,6 @@ def predict_video():
             if mm_per_px is None:
                 mm_per_px = ELECTRODE_DIAMETER_MM / float(width_px_electrode)
 
-        # ---- Distances (horizontal) ----
-        # Clearance = wall-to-rod *surface* (not center). Use radius in px.
         clearance_left_mm = None
         clearance_right_mm = None
         center_to_left_mm = None
@@ -166,19 +160,16 @@ def predict_video():
         if (groove_mask is not None) and (electrode_center is not None):
             cx, cy = electrode_center
 
-            # pick edges from seg mask OR from groove bbox (controlled by toggle)
             xL, xR, y_used = groove_edges_at_y(cy, groove_mask, groove_bbox, USE_GROOVE_BBOX_FOR_EDGES, search=6)
             if (xL is not None) and (xR is not None):
                 groove_left_x = xL
                 groove_right_x = xR
 
-                # draw points + strictly horizontal lines at y=cy
-                cv2.circle(vis, (cx, cy), 5, (0, 0, 255), -1)  # electrode center
+                cv2.circle(vis, (cx, cy), 5, (0, 0, 255), -1)
                 cv2.circle(vis, (xL, cy), 4, (255, 0, 0), -1)
                 cv2.circle(vis, (xR, cy), 4, (255, 0, 0), -1)
 
                 if mm_per_px is not None:
-                    # center-to-wall (for reference)
                     center_to_left_mm = abs(cx - xL) * mm_per_px
                     center_to_right_mm = abs(xR - cx) * mm_per_px
 
@@ -198,15 +189,15 @@ def predict_video():
                     color=(0, 255, 0), thickness=2
                 )
 
-        # ---- show FPS ----
+
         cv2.putText(vis, f'FPS: {fps:.1f}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,(0,255,0),2)
         cv2.imshow("YOLO Real-time Prediction", cv2.resize(vis, None, fx=1, fy=1))  # fx=0.6, fy=0.6
 
-        # ---- periodic JSON update ----
+
         cur_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
         if cur_ms >= next_record_ms:
             record.update({
-                "timestamp_ms": float(cur_ms),  # optional: can keep or remove if you don’t want timestamp
+                "timestamp_ms": float(cur_ms),
                 "mm_per_px": float(mm_per_px) if mm_per_px is not None else None,
                 "electrode_center_px": list(electrode_center) if electrode_center else None,
                 "electrode_bbox_px": list(ebox[:4]) if ebox else None,
@@ -218,7 +209,7 @@ def predict_video():
                 "clearance_left_mm": float(clearance_left_mm) if clearance_left_mm is not None else None,
                 "clearance_right_mm": float(clearance_right_mm) if clearance_right_mm is not None else None,
             })
-            # overwrite JSON file each update
+
             try:
                 with open(OUTPUT_JSON_PATH, "w", encoding="utf-8") as f:
                     json.dump(record, f, indent=2)
@@ -228,14 +219,13 @@ def predict_video():
             while next_record_ms <= cur_ms:
                 next_record_ms += RECORD_EVERY_MS
 
-    # ==== clean up ====
+
     cap.release()
     cv2.destroyAllWindows()
 
     if fps_list:
         print(f"Average FPS: {sum(fps_list)/len(fps_list):.2f}")
 
-    # Save JSON (list of dicts)
     # try:
     #     with open(OUTPUT_JSON_PATH, "w", encoding="utf-8") as f:
     #         json.dump(records, f, indent=2)
