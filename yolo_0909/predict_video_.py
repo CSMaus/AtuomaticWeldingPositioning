@@ -84,17 +84,25 @@ def edge_xs_at_y_with_fallback(bin_mask, y, search=6):
                     return int(xs.min()), int(xs.max()), int(yy)
     return None, None, None
 
-def draw_hline_with_text(img, y, x1, x2, txt=None, color=(0,255,0), thickness=2):
+def draw_hline_with_text(img, y, x1, x2, txt=None, color=(0,255,0),
+                         thickness=2, position="above"):
     cv2.line(img, (x1, y), (x2, y), color, thickness)
     if txt:
-        midx = (x1 + x2) // 2
-        cv2.putText(img, txt, (midx, y - 6), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 2, cv2.LINE_AA)
+        if position == "left":
+            org = (x1 - 80, y + 10)   # shift left
+        elif position == "right":
+            org = (x2 + 10, y + 10)   # shift right
+        else:
+            org = ((x1 + x2)//2, y - 6)
+
+        cv2.putText(img, txt, org, cv2.FONT_HERSHEY_SIMPLEX,
+                    1.0, color, 2, cv2.LINE_AA)
 
 
 def predict_video():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(script_dir)
-    videos_dir  = os.path.join(project_dir, "data", "basler_recordings")
+    videos_dir  = os.path.join(project_dir, "data", "Curve_250808")  # "basler_recordings")
 
     vids = [f for f in os.listdir(videos_dir) if f.lower().endswith(('.mp4','.avi','.mov'))]
     if not vids:
@@ -103,7 +111,7 @@ def predict_video():
     idx = int(input("Enter video index: "))
     video_path = os.path.join(videos_dir, vids[idx])
 
-    model_path = os.path.join(script_dir, "runs", "segment", "weld_seg_0910_1-", "weights", "best.pt")
+    model_path = os.path.join(script_dir, "runs", "segment", "weld_seg_0911_1-", "weights", "best.pt")
     if not os.path.exists(model_path):
         print("Trained model not found!"); return
     model = YOLO(model_path)
@@ -180,13 +188,13 @@ def predict_video():
 
                 draw_hline_with_text(
                     vis, cy, min(cx, xL), max(cx, xL),
-                    f"{clearance_left_mm:.2f} mm" if (DRAW_DISTANCE_TEXT and clearance_left_mm is not None) else None,
-                    color=(0, 255, 0), thickness=2
+                    f"{center_to_left_mm:.2f} mm" if (DRAW_DISTANCE_TEXT and center_to_left_mm is not None) else None,
+                    color=(0, 255, 0), thickness=2, position="left"
                 )
                 draw_hline_with_text(
                     vis, cy, min(cx, xR), max(cx, xR),
-                    f"{clearance_right_mm:.2f} mm" if (DRAW_DISTANCE_TEXT and clearance_right_mm is not None) else None,
-                    color=(0, 255, 0), thickness=2
+                    f"{center_to_right_mm:.2f} mm" if (DRAW_DISTANCE_TEXT and center_to_right_mm is not None) else None,
+                    color=(0, 255, 0), thickness=2, position="right"
                 )
 
 

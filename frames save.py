@@ -6,11 +6,11 @@ import glob
 # videos_path = "D:/work_doks/projects/Doosan. Welding/2025/data/"
 # videos_path = "D:/ML_DL_AI_stuff/!!DoosanWelding2025/data/basler_recordings/"
 # save_path = "D:/ML_DL_AI_stuff/!!DoosanWelding2025/data/br_frames-0909/"
-videos_path = "data/labeling data/"
-save_path = "data/labeling data-0910/"
+videos_path = "data/Curve_250808/"
+save_path = "data/Curve_250808-0911/"
 files = glob.glob(os.path.join(videos_path, '*.mp4'))
 
-this_video_path = files[7]  # os.listdir(videos_path)[5]; this_video_path = os.path.join(videos_path, video_name)
+this_video_path = files[6]  # os.listdir(videos_path)[5]; this_video_path = os.path.join(videos_path, video_name)
 video_name = this_video_path.split("\\")[-1]
 print("Video name       :", video_name)
 
@@ -40,8 +40,7 @@ while cap.isOpened():
         print("Saved to: ", f"{save_path}/{video_name[:-4]}-frame_{count:04d}.png")
         saved_num += 1
 
-    elif key == ord('q'):
-        break
+    elif key in (27, ord('q')): break
     count += 1
 
 print(f"saved {saved_num} frames")

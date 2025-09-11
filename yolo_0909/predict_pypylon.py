@@ -90,7 +90,7 @@ def draw_hline_with_text(img, y, x1, x2, txt=None, color=(0,255,0), thickness=2)
 def predict_video():
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    model_path = os.path.join(script_dir, "runs", "segment", "weld_seg_0910_1-", "weights", "best.pt")
+    model_path = os.path.join(script_dir, "runs", "segment", "weld_seg_0911_1-", "weights", "best.pt")
     if not os.path.exists(model_path):
         print("Trained model not found!"); return
     model = YOLO(model_path)
