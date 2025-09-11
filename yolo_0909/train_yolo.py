@@ -24,12 +24,12 @@ names: ['grove', 'wrod']"""
     
     results = model.train(
         data=yaml_path,
-        epochs=20,
+        epochs=28,
         imgsz=640,
         batch=8,
         device=device,
         project=os.path.join(script_dir, 'runs/segment'),
-        name='weld_seg_0910_1-',
+        name='weld_seg_0911_1-',
         save=True,
         save_period=4,
         patience=20,

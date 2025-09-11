@@ -70,7 +70,8 @@ def prepare_yolo_dataset():
     annotation_files = [
         ("annotations-basler_recordings_frames-el.xml", "basler_recordings_frames"),
         ("annotations-br_frames-0909-el.xml", "br_frames-0909"),
-        ("annotations-labeling data-0910-el.xml", "labeling data-0910")
+        ("annotations-labeling data-0910-el.xml", "labeling data-0910"),
+        ("annotations-Curve_250808-0911-el.xml", "Curve_250808-0911")
     ]
     
     all_images = []
