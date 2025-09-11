@@ -36,3 +36,4 @@ yolo_0909/predict_video_all.py
 yolo_0909/temp_config.yaml
 data/Curve_250808/data.xlsx
 data/old_videos/Robot data.xlsx
+*.mkv
