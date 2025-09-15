@@ -37,3 +37,4 @@ yolo_0909/temp_config.yaml
 data/Curve_250808/data.xlsx
 data/old_videos/Robot data.xlsx
 *.mkv
+/yolo_0909/current_program

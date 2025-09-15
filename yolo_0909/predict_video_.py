@@ -1,3 +1,13 @@
+# To check with videos, define folder to videos directory in:
+# videos_dir  = os.path.join(project_dir, "data", "Curve_250808")
+# folder "runs" with all structure should be in same path as script, so yolo could load pretrained weights
+
+# after you setup videos directory folder correctly, then you can choose video index from printed list of videos
+# press "Space" to pause/resume video
+# press Esc or q to stop program
+
+# for any questions: 바라쇼크 크세니아 (Barashok Kseniia) <kseniia@changwon.ac.kr>
+
 import os, time, json, cv2, numpy as np
 from ultralytics import YOLO
 
@@ -7,7 +17,7 @@ DRAW_MASK_AND_BBOX = True
 DRAW_DISTANCE_TEXT = True
 USE_GROOVE_BBOX_FOR_EDGES = False
 SCALE_MM_PER_PX_MANUAL = None
-ELECTRODE_DIAMETER_MM  = 4.0
+ELECTRODE_DIAMETER_MM  = 4.3
 RECORD_EVERY_MS = 500
 OUTPUT_JSON_PATH = "measurements.json"
 
@@ -25,11 +35,6 @@ def bbox_from_mask(bin_mask):
     return (x1, y1, x2, y2)
 
 def groove_edges_at_y(cy, groove_mask, groove_bbox, use_bbox, search=6):
-    """
-    Return left_x, right_x, y_used.
-    - If use_bbox: use bbox vertical edges at y=clamped(cy).
-    - Else: use segmentation mask row (with fallback +/- search).
-    """
     if use_bbox and groove_bbox is not None:
         gx1, gy1, gx2, gy2 = groove_bbox
         y_used = int(np.clip(cy, gy1, gy2))
@@ -37,7 +42,6 @@ def groove_edges_at_y(cy, groove_mask, groove_bbox, use_bbox, search=6):
     return edge_xs_at_y_with_fallback(groove_mask, cy, search=search)
 
 def resize_masks_to_frame(res, H, W):
-    """Return list of (cls_id, mask_uint8) resized to frame size."""
     if res.masks is None:
         return []
     raw_masks = res.masks.data.cpu().numpy()
@@ -50,7 +54,6 @@ def resize_masks_to_frame(res, H, W):
     return out
 
 def pick_largest_mask(masks_for_class):
-    """Pick largest area mask (uint8 >0) from a list."""
     if not masks_for_class:
         return None
     areas = [int((m > 0).sum()) for m in masks_for_class]
@@ -68,7 +71,7 @@ def best_electrode_bbox(res):
         if cls_id == CLASS_WROD:
             if (best is None) or (conf > best[-1]):
                 best = (int(box[0]), int(box[1]), int(box[2]), int(box[3]), float(conf))
-    return best  # or None
+    return best  # None
 
 def edge_xs_at_y_with_fallback(bin_mask, y, search=6):
     """
@@ -89,9 +92,9 @@ def draw_hline_with_text(img, y, x1, x2, txt=None, color=(0,255,0),
     cv2.line(img, (x1, y), (x2, y), color, thickness)
     if txt:
         if position == "left":
-            org = (x1 - 80, y + 10)   # shift left
+            org = (x1 - 80, y + 10)
         elif position == "right":
-            org = (x2 + 10, y + 10)   # shift right
+            org = (x2 + 10, y + 10)
         else:
             org = ((x1 + x2)//2, y - 6)
 
@@ -181,7 +184,7 @@ def predict_video():
                     center_to_left_mm = abs(cx - xL) * mm_per_px
                     center_to_right_mm = abs(xR - cx) * mm_per_px
 
-                    # clearance = wall ↔ rod surface (subtract radius)
+                    # clearance = distance with subtracted radius
                     r_px = (ELECTRODE_DIAMETER_MM / mm_per_px) / 2.0
                     clearance_left_mm = max(0.0, (cx - r_px - xL) * mm_per_px)
                     clearance_right_mm = max(0.0, (xR - (cx + r_px)) * mm_per_px)
@@ -233,13 +236,6 @@ def predict_video():
 
     if fps_list:
         print(f"Average FPS: {sum(fps_list)/len(fps_list):.2f}")
-
-    # try:
-    #     with open(OUTPUT_JSON_PATH, "w", encoding="utf-8") as f:
-    #         json.dump(records, f, indent=2)
-    #     print(f"Saved {len(records)} records to {OUTPUT_JSON_PATH}")
-    # except Exception as e:
-    #     print("Failed to write JSON:", e)
 
 if __name__ == "__main__":
     predict_video()
