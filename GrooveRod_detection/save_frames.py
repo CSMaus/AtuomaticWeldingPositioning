@@ -3,9 +3,9 @@ import csv
 from pathlib import Path
 import cv2
 
-# Paths
 root = Path.cwd().parents[2] / "data"
-output_path = root / "RL_Groove_Rod-Data"
+videos_folders_list = ["basler_recordings", "Curve_250808", "focusing data", "labeling data"]
+output_path = root / "AllFrames-Data"
 output_path.mkdir(parents=True, exist_ok=True)
 
 log_csv = output_path / "saved_frames_index.csv"
@@ -24,7 +24,7 @@ def read_and_save_video_frames(video_path: Path, tosave_path: Path, frames_step:
     frame_id = 0
     saved_count = 0
 
-    tosave_path.mkdir(parents=True, exist_ok=True)
+    # tosave_path.mkdir(parents=True, exist_ok=True)
 
     with log_csv.open("a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -35,7 +35,7 @@ def read_and_save_video_frames(video_path: Path, tosave_path: Path, frames_step:
                 break
 
             if frame_id % frames_step == 0:
-                outfile = tosave_path / f"{name}-frame_{frame_id:06d}.jpg"
+                outfile = tosave_path / f"{name}-frame_{frame_id:06d}.png"
                 cv2.imwrite(str(outfile), frame)
                 writer.writerow([name, frame_id, str(outfile)])
                 saved_count += 1
@@ -46,16 +46,17 @@ def read_and_save_video_frames(video_path: Path, tosave_path: Path, frames_step:
     print(f"For video '{name}' saved {saved_count} frames (step={frames_step})")
     return saved_count
 
-for folder in sorted(os.listdir(root)):
+for folder in videos_folders_list:
+    # sorted(os.listdir(root)):
     if folder == "old_videos":
         continue
     folder_path = root / folder
     if not folder_path.is_dir():
         continue
 
-    save_frames_dir = output_path / folder
-    save_frames_dir.mkdir(parents=True, exist_ok=True)
+    # save_frames_dir = output_path / folder
+    # save_frames_dir.mkdir(parents=True, exist_ok=True)
 
-    videos = sorted([p for p in folder_path.iterdir() if p.is_file() and p.suffix.lower() == ".mp4"])
+    videos = sorted([p for p in folder_path.iterdir() if p.is_file() and p.suffix.lower() in [".mp4", ".avi"]])
     for video in videos:
-        read_and_save_video_frames(video, save_frames_dir, frames_step=5)
+        read_and_save_video_frames(video, output_path, frames_step=5)
