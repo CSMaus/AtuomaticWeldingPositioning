@@ -1,9 +1,8 @@
-import os
-import csv
+import os, csv, cv2, math
 from pathlib import Path
-import cv2
 
 root = Path.cwd().parents[2] / "data"
+print(root)
 videos_folders_list = ["basler_recordings", "Curve_250808", "focusing data", "labeling data"]
 output_path = root / "AllFrames-Data"
 output_path.mkdir(parents=True, exist_ok=True)
@@ -13,6 +12,18 @@ if not log_csv.exists():
     with log_csv.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["video", "frame_index", "saved_file"])
+
+def pick_step_for_video(video_path: Path, source_folder: str) -> int:
+    target = 160 if source_folder == "Curve_250808" else 86
+    cap = cv2.VideoCapture(str(video_path))
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    cap.release()
+    if total <= 0:
+        return 5
+
+    step = max(1, math.ceil(total / target))
+    return step
+
 
 def read_and_save_video_frames(video_path: Path, tosave_path: Path, frames_step: int = 5):
     name = video_path.stem
@@ -59,4 +70,5 @@ for folder in videos_folders_list:
 
     videos = sorted([p for p in folder_path.iterdir() if p.is_file() and p.suffix.lower() in [".mp4", ".avi"]])
     for video in videos:
-        read_and_save_video_frames(video, output_path, frames_step=5)
+        adaptive_step = pick_step_for_video(video, folder)
+        read_and_save_video_frames(video, output_path, frames_step=adaptive_step)
