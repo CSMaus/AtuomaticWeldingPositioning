@@ -1,49 +1,61 @@
-import sys
-
-import cv2
 import os
+import csv
 from pathlib import Path
+import cv2
 
-path = os.path.join(Path.cwd().parents[2], "data/")
+# Paths
+root = Path.cwd().parents[2] / "data"
+output_path = root / "RL_Groove_Rod-Data"
+output_path.mkdir(parents=True, exist_ok=True)
 
-folders = [name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
-output_path = os.path.join(path, "RL_Groove_Rod-Data/")
+log_csv = output_path / "saved_frames_index.csv"
+if not log_csv.exists():
+    with log_csv.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["video", "frame_index", "saved_file"])
 
-if not os.path.exists(output_path):
-    os.makedirs(output_path)
-
-def read_and_save_video_frames(video_path, tosave_path, frames_step = 5):
-    name = os.path.splitext(os.path.basename(video_path))[0]
-    cap = cv2.VideoCapture(video_path)
+def read_and_save_video_frames(video_path: Path, tosave_path: Path, frames_step: int = 5):
+    name = video_path.stem
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        print(f"[WARN] Cannot open video: {video_path}")
+        return 0
 
     frame_id = 0
-    # save_id = 1
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        if frame_id % frames_step == 0:
-            cv2.imwrite(f"{tosave_path}/{name}-frame_{frame_id:04d}.jpg", frame)
-            # save_id += 1
-        frame_id += 1
+    saved_count = 0
 
-    print(f"For video '{name}' saved {frame_id // 5 + 1} frames")
+    tosave_path.mkdir(parents=True, exist_ok=True)
+
+    with log_csv.open("a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            if frame_id % frames_step == 0:
+                outfile = tosave_path / f"{name}-frame_{frame_id:06d}.jpg"
+                cv2.imwrite(str(outfile), frame)
+                writer.writerow([name, frame_id, str(outfile)])
+                saved_count += 1
+
+            frame_id += 1
+
     cap.release()
+    print(f"For video '{name}' saved {saved_count} frames (step={frames_step})")
+    return saved_count
 
+for folder in sorted(os.listdir(root)):
+    if folder == "old_videos":
+        continue
+    folder_path = root / folder
+    if not folder_path.is_dir():
+        continue
 
-# TODO: I think we can use same annotation for same frame index for same folder, bcs they are different only with the focusing.
-# TODO: test these annotations **WITH adjusted for initial frame shift**
-for folder in folders:
-    if folder != "old_videos":
-        save_frames = os.path.join(output_path, folder)
-        if not os.path.exists(save_frames):
-            os.makedirs(save_frames)
+    save_frames_dir = output_path / folder
+    save_frames_dir.mkdir(parents=True, exist_ok=True)
 
-        videos_path = os.path.join(path, folder)
-        videos = [f for f in os.listdir(videos_path) if f.endswith(".mp4") and os.path.isfile(os.path.join(videos_path, f))]
-        for video in videos:
-            read_and_save_video_frames(os.path.join(videos_path, video), save_frames)
-
-
-
-
+    videos = sorted([p for p in folder_path.iterdir() if p.is_file() and p.suffix.lower() == ".mp4"])
+    for video in videos:
+        read_and_save_video_frames(video, save_frames_dir, frames_step=5)
