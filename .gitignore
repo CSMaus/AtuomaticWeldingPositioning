@@ -39,3 +39,5 @@ data/old_videos/Robot data.xlsx
 *.mkv
 /yolo_0909/current_program
 /GrabByCommand/runs
+GrabByCommand/metrics_dynamic.csv
+*.csv
