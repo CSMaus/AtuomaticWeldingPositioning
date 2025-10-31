@@ -10,6 +10,7 @@
 
 import os, time, json, cv2, numpy as np
 from ultralytics import YOLO
+from pathlib import Path
 
 
 # PARAMS
@@ -105,7 +106,8 @@ def draw_hline_with_text(img, y, x1, x2, txt=None, color=(0,255,0),
 def predict_video():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(script_dir)
-    videos_dir  = os.path.join(project_dir, "data", "Curve_250808")  # "basler_recordings")
+    data_dir = Path.cwd().parents[2] / "data"
+    videos_dir  = os.path.join(data_dir, "Curve_250808")  # "basler_recordings")
 
     vids = [f for f in os.listdir(videos_dir) if f.lower().endswith(('.mp4','.avi','.mov'))]
     if not vids:
