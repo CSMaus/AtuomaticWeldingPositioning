@@ -1,8 +1,12 @@
+# save frames from videos which I already saved and annotated using cvat
+# not for yolo train DS preparation
 import os, csv, cv2
+import sys
 from pathlib import Path
 
-root = Path.cwd().parents[2] / "data"
-print(root)
+root = Path.cwd().parents[1] / "data"  # [1] for oem pc, [2] for my other
+# print(root)
+# sys.exit()
 videos_folders_list = ["basler_recordings", "Curve_250808", "focusing data", "labeling data"]
 output_path = root / "AllFrames-Data"
 output_path.mkdir(parents=True, exist_ok=True)

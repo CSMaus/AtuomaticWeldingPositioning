@@ -1,7 +1,7 @@
 # this is for yolo12 and recently collected 3.5k images...
 import os
 import cv2
-import json
+import xml.etree.ElementTree as ET
 import shutil
 from tqdm import tqdm
 import random
@@ -12,42 +12,25 @@ CLASS_MAP = {
     "Electrode": 1
 }
 
-def parse_json_annotations(ann_dir):
+def parse_xml_dir(ann_dir):
     annotations = {}
     for p in sorted(Path(ann_dir).iterdir()):
-        if p.is_file() and p.suffix.lower() == ".json" and p.name.startswith("annotation-"):
-            with p.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict):
-                data = data.get("annotations", data.get("items", data.get("results", [])))
-            if not isinstance(data, list):
-                data = []
-            for item in data:
-                name = item.get("image") or item.get("image_path") or item.get("imagePath") or item.get("file_name") or item.get("filename")
-                if not name:
-                    continue
-                name = os.path.basename(name)
-                width = item.get("width") or item.get("imageWidth")
-                height = item.get("height") or item.get("imageHeight")
-                shapes = item.get("shapes") or item.get("polygons") or item.get("objects") or []
-                polygons = []
-                for s in shapes:
-                    label = s.get("label") or s.get("class") or s.get("name")
-                    pts = s.get("points") or s.get("polygon") or s.get("segmentation")
-                    if isinstance(pts, list) and len(pts) > 0 and isinstance(pts[0], list):
-                        pass
-                    elif isinstance(pts, list) and len(pts) % 2 == 0:
-                        pts = [[float(pts[i]), float(pts[i+1])] for i in range(0, len(pts), 2)]
-                    else:
-                        continue
-                    try:
-                        pts = [(float(x), float(y)) for x, y in pts]
-                    except:
-                        continue
-                    polygons.append({"points": pts, "label": label})
+        if p.is_file() and p.suffix.lower() == ".xml" and p.name.startswith("annotations-"):
+            tree = ET.parse(str(p))
+            root = tree.getroot()
+            for image in root.findall(".//image"):
+                name = os.path.basename(image.get("name"))
+                width = int(image.get("width"))
+                height = int(image.get("height"))
+                polys = []
+                for polygon in image.findall("polygon"):
+                    points_str = polygon.get("points")
+                    label = polygon.get("label", "")
+                    pts = [tuple(map(float, s.split(","))) for s in points_str.strip().split(";")]
+                    polys.append({"points": pts, "label": label})
                 if name not in annotations:
                     annotations[name] = {"width": width, "height": height, "polygons": []}
-                annotations[name]["polygons"].extend(polygons)
+                annotations[name]["polygons"].extend(polys)
     return annotations
 
 def normalize_points(points, width, height):
@@ -67,20 +50,34 @@ def save_yolo_label(label_path, polygons, width, height):
 
 def prepare_yolo_dataset():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(script_dir)
-    data_dir = os.path.join(project_dir, "data")
+    data_dir = Path.cwd().parents[1] / "data"
     images_dir = os.path.join(data_dir, "AllFrames-Data")
-    annotations_dir = os.path.join(data_dir, "annotations_json")
+    print("Images dir:", images_dir)
+    print(len(os.listdir(os.path.join(images_dir))))
+    annotations_dir = os.path.join(data_dir, "AllFrames-Annotations")
+    print("annotations_dir:", annotations_dir)
+    print(os.listdir(os.path.join(annotations_dir)))
     output_dir = os.path.join(script_dir, "dataset")
+    print("output_dir", output_dir)
     for split in ["train", "val"]:
         os.makedirs(f"{output_dir}/images/{split}", exist_ok=True)
         os.makedirs(f"{output_dir}/labels/{split}", exist_ok=True)
-    ann = parse_json_annotations(annotations_dir)
+    ann = parse_xml_dir(annotations_dir)
     all_items = []
     for img_name, ann_data in ann.items():
         img_path = os.path.join(images_dir, img_name)
         if not os.path.exists(img_path):
-            continue
+            base, _ = os.path.splitext(os.path.basename(img_name))
+            found = False
+            for ext in (".png", ".jpg", ".jpeg"):
+                alt = os.path.join(images_dir, base + ext)
+                if os.path.exists(alt):
+                    img_path = alt
+                    img_name = base + ext
+                    found = True
+                    break
+            if not found:
+                continue
         polys = [p for p in ann_data["polygons"] if (p.get("label") in CLASS_MAP)]
         if not any(p.get("label") == "groove center" for p in polys):
             continue
