@@ -6,7 +6,8 @@ CLASS_GROOVE = 0
 CLASS_WROD = 1
 
 VIDEO_PATH = r"D:\ML_DL_AI_stuff\!!DoosanWelding2025\data\Curve_250808\all move.mp4"
-WEIGHTS_PATH = r"runs/segment/weld_seg_0911_1-/weights/best.pt"
+# WEIGHTS_PATH = r"runs/segment/weld_seg_0911_1-/weights/best.pt"
+WEIGHTS_PATH = r"runs/segment/weld_seg_1103-2/weights/best.pt"
 CONF = 0.3
 STATIC_RUNS = 50
 ELECTRODE_MM = 4.3
