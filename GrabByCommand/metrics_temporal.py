@@ -20,6 +20,13 @@ SMOOTH_BETA_SCALE = 0.85
 MAX_JUMP_PX = 2
 MAX_JUMP_MM = 0.1
 
+SMOOTH_BETA_CX = 0.93
+MAX_JUMP_CX_MM = 0.08
+MEDIAN_CX_WIN  = 5
+LAMBDA_IOU_BOX = 0.6
+
+fps_list = []
+
 class YoloFrameMeasurer:
     def __init__(self, weights_path, electrode_diameter_mm=4.3, scale_mm_per_px=None, draw_masks=True, draw_distance=True):
         self.model = YOLO(weights_path)
@@ -37,11 +44,19 @@ class YoloFrameMeasurer:
         self.prev_mm_per_px = None
         dummy = np.zeros((512, 512, 3), dtype=np.uint8)
         _ = self.model(dummy, verbose=False)
+
+        # this is new - recheck
+        self.prev_ebox = None
+        self.cx_kf = make_kalman_1d()
+        self.cx_buf = deque(maxlen=MEDIAN_CX_WIN)
     def reset_state(self):
         self.prev_groove_mask = None
         self.prev_xL = None
         self.prev_cx = None
         self.prev_mm_per_px = None
+
+        self.prev_ebox = None
+        self.cx_buf.clear()
     @staticmethod
     def _resize_masks(res, H, W):
         if res.masks is None: return []
@@ -55,16 +70,22 @@ class YoloFrameMeasurer:
             out.append((c, m8, s))
         return out
     @staticmethod
-    def _best_wrod_bbox(res):
+    def _best_wrod_bbox(self, res):  # this is new - recheck
         if res.boxes is None: return None
         xyxy = res.boxes.xyxy.cpu().numpy()
         cls_ = res.boxes.cls.cpu().numpy().astype(int)
         conf = res.boxes.conf.cpu().numpy()
-        best = None
-        for box, c, s in zip(xyxy, cls_, conf):
-            if c == CLASS_WROD and (best is None or s > best[-1]):
-                best = (int(box[0]), int(box[1]), int(box[2]), int(box[3]), float(s))
-        return best
+        cand = [(tuple(map(int, box[:4])), float(s)) for box, c, s in zip(xyxy, cls_, conf) if c == CLASS_WROD]
+        if not cand: return None
+        if self.prev_ebox is None:
+            box, s = max(cand, key=lambda t: t[1]);
+            return (*box, s)
+        scored = []
+        for box, s in cand:
+            score = s + LAMBDA_IOU_BOX * iou_box((*box, 0.0), self.prev_ebox)
+            scored.append((score, box, s))
+        _, box, s = max(scored, key=lambda t: t[0])
+        return (*box, s)
     @staticmethod
     def _edge_xs_at_y(mask, y, search=6):
         H, W = mask.shape
@@ -118,9 +139,14 @@ class YoloFrameMeasurer:
         masks = self._resize_masks(res, H, W)
         groove_mc = [(m, s) for cid, m, s in masks if cid == CLASS_GROOVE]
         groove_mask = self._select_groove_mask(groove_mc)
-        ebox = self._best_wrod_bbox(res)
+
+        ebox = self._best_wrod_bbox(self, res) # this is new - recheck
+        
         if groove_mask is None or ebox is None:
             return False, {}, frame
+        # # this is new - recheck
+        self.prev_ebox = ebox
+
         x1, y1, x2, y2, _ = ebox
         cx_raw, cy = (x1 + x2) // 2, (y1 + y2) // 2
         width_px = max(1, x2 - x1)
@@ -133,12 +159,25 @@ class YoloFrameMeasurer:
         else:
             mm_per_px = self._smooth(self.prev_mm_per_px, mm_per_px_raw, SMOOTH_BETA_SCALE)
         cap_px = max(1, int(round(MAX_JUMP_MM / max(mm_per_px, 1e-6))))
-        if self.prev_cx is None:
+        '''if self.prev_cx is None:
             cx = cx_raw
         else:
             # cx_c = self._clamp_jump(self.prev_cx, cx_raw, MAX_JUMP_PX)
             cx_c = self._clamp_jump(self.prev_cx, cx_raw, cap_px)
-            cx = self._smooth(self.prev_cx, cx_c, SMOOTH_BETA_X)
+            cx = self._smooth(self.prev_cx, cx_c, SMOOTH_BETA_X)'''
+
+        # this is new - recheck kalman
+        cx_pred = float(self.cx_kf.predict()[0, 0])
+        meas = np.array([[np.float32(cx_raw)]])
+        cx_corr = float(self.cx_kf.correct(meas)[0, 0])
+        cap_cx_px = max(1, int(round(MAX_JUMP_CX_MM / max(mm_per_px, 1e-6))))
+        if self.prev_cx is not None:
+            cx_corr = self._clamp_jump(self.prev_cx, cx_corr, cap_cx_px)
+        cx_s = self._smooth(self.prev_cx if self.prev_cx is not None else cx_corr, cx_corr, SMOOTH_BETA_CX)
+        self.cx_buf.append(cx_s)
+        cx = float(np.median(self.cx_buf))
+
+
         if self.prev_xL is None:
             xL = xL_raw
         else:
@@ -160,6 +199,30 @@ class YoloFrameMeasurer:
         self.prev_mm_per_px = float(mm_per_px)
         metrics = dict(xL_px=int(round(xL)), cx_px=int(round(cx)), cy_px=int(cy), mm_per_px=float(mm_per_px), dist_mm=float(distance_mm))
         return True, metrics, vis
+
+# this is new - recheck
+def make_kalman_1d():
+    k = cv2.KalmanFilter(2,1)
+    k.transitionMatrix   = np.array([[1,1],[0,1]], np.float32)
+    k.measurementMatrix  = np.array([[1,0]], np.float32)
+    k.processNoiseCov    = np.eye(2, dtype=np.float32) * 1e-2
+    k.measurementNoiseCov= np.array([[1e-1]], np.float32)
+    k.errorCovPost       = np.eye(2, dtype=np.float32)
+    k.statePost          = np.zeros((2,1), np.float32)
+    return k
+
+# this is new - recheck
+def iou_box(a, b):
+    if a is None or b is None: return 0.0
+    ax1, ay1, ax2, ay2 = a[:4]; bx1, by1, bx2, by2 = b[:4]
+    ix1, iy1 = max(ax1,bx1), max(ay1,by1)
+    ix2, iy2 = min(ax2,bx2), min(ay2,by2)
+    iw, ih = max(0, ix2-ix1), max(0, iy2-iy1)
+    inter = iw*ih
+    aarea = max(0, ax2-ax1)*max(0, ay2-ay1)
+    barea = max(0, bx2-bx1)*max(0, by2-by1)
+    den = aarea + barea - inter
+    return 0.0 if den<=0 else inter/den
 
 def write_csv(path, rows, header):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -244,15 +307,21 @@ def main():
         ok, frame = cap.read()
         if not ok:
             break
+
+        t0 = time.time()
+
         okm, m, vis = measurer.measure_on_frame(frame, conf_thresh=CONF)
         if okm:
             txt = f"d={m['dist_mm']:.2f} mm | xL={m['xL_px']} | cx={m['cx_px']}"
         else:
             txt = "NO MEASURE"
         cv2.putText(vis, txt, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2, cv2.LINE_AA)
+        fps_m = 1.0 / max(1e-6, time.time() - t0)
+        cv2.putText(vis, str(fps_m), (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,55,55), 2, cv2.LINE_AA)
         cv2.imshow("YOLO Video Measure", vis)
+        fps_list.append(fps_m)
         # time.sleep(0.05)  # it slowed down the whole predictions - bcs I wanted to check without kalman and others
-        # need to check FPS again
+        # need to check fps
         frame_idx = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) - 1
         t_sec = frame_idx / fps if fps > 0 else (time.time() - start_t)
         row = dict(frame_index=frame_idx, t_sec=round(t_sec, 4))
@@ -278,6 +347,7 @@ def main():
         print("Saved: metrics_dynamic.csv, video_xL_px.png, video_cx_px.png, video_dist_mm.png")
     if len(static_rows) > 0:
         print("Saved: metrics_static.csv, static_xL_px.png, static_cx_px.png, static_dist_mm.png")
+    if fps_list: print(f"Average FPS: {sum(fps_list) / len(fps_list):.2f}")
 
 if __name__ == "__main__":
     main()
