@@ -1,6 +1,7 @@
 import cv2, numpy as np, random, os, csv, time
 from ultralytics import YOLO
 import matplotlib.pyplot as plt
+import torch
 from collections import deque
 
 CLASS_GROOVE = 0
@@ -22,6 +23,9 @@ MAX_JUMP_MM = 0.1
 class YoloFrameMeasurer:
     def __init__(self, weights_path, electrode_diameter_mm=4.3, scale_mm_per_px=None, draw_masks=True, draw_distance=True):
         self.model = YOLO(weights_path)
+        self.model.to('cuda')
+        self.model.fuse()
+        torch.backends.cudnn.benchmark = True  # it should be already in cuda, but anyway
         self.electrode_diameter_mm = float(electrode_diameter_mm)
         self.scale_mm_per_px_manual = scale_mm_per_px
         self.draw_masks = draw_masks
@@ -107,7 +111,10 @@ class YoloFrameMeasurer:
         return new
     def measure_on_frame(self, frame, conf_thresh=0.3):
         H, W = frame.shape[:2]
-        res = self.model(frame, verbose=False, conf=conf_thresh)[0]
+        # res = self.model(frame, verbose=False, conf=conf_thresh)[0]
+        # maybe it will improve accuracy, especially +-1 pixel fluctuations
+        res = self.model(frame, verbose=False, conf=conf_thresh, imgsz=960, device=0, half=True,
+                         classes=[CLASS_GROOVE, CLASS_WROD])[0]
         masks = self._resize_masks(res, H, W)
         groove_mc = [(m, s) for cid, m, s in masks if cid == CLASS_GROOVE]
         groove_mask = self._select_groove_mask(groove_mc)
@@ -140,8 +147,8 @@ class YoloFrameMeasurer:
             xL = self._smooth(self.prev_xL, xL_c, SMOOTH_BETA_X)
         distance_mm = abs(cx - xL) * mm_per_px
         vis = frame.copy()
-        if self.draw_masks:
-            vis = cv2.addWeighted(vis, 0.6, res.plot(), 0.4, 0)
+        # if self.draw_masks:  # do not draw masks, maybe it will speed up
+        #     vis = cv2.addWeighted(vis, 0.6, res.plot(), 0.4, 0)
         if self.draw_distance:
             cv2.circle(vis, (int(round(cx)), int(round(cy))), 5, (0, 0, 255), -1)
             cv2.circle(vis, (int(round(xL)), int(round(cy))), 5, (255, 0, 0), -1)
@@ -244,7 +251,8 @@ def main():
             txt = "NO MEASURE"
         cv2.putText(vis, txt, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2, cv2.LINE_AA)
         cv2.imshow("YOLO Video Measure", vis)
-        time.sleep(0.05)
+        # time.sleep(0.05)  # it slowed down the whole predictions - bcs I wanted to check without kalman and others
+        # need to check FPS again
         frame_idx = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) - 1
         t_sec = frame_idx / fps if fps > 0 else (time.time() - start_t)
         row = dict(frame_index=frame_idx, t_sec=round(t_sec, 4))
