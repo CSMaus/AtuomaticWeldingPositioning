@@ -5,7 +5,11 @@ import cv2
 # import time
 
 if __name__ == "__main__":
-    measurer = BaslerYoloMeasurer("runs/segment/weld_seg_0911_1-/weights/best.pt")
+    measurer = BaslerYoloMeasurer(
+        "runs/segment/weld_seg_1103-2/weights/best.pt",
+        draw_masks=False,
+        draw_distance=True,  # dots and distance line between them
+    )
     while True:
 
         # if need to display image constantly, can call show_one_frame function like this:
