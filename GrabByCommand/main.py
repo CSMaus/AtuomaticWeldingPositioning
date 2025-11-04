@@ -1,5 +1,6 @@
 # main
-from .BaslerYoloMeasurer import BaslerYoloMeasurer
+# from .BaslerYoloMeasurer import BaslerYoloMeasurer
+from .BaslerYoloM_1 import BaslerYoloMeasurer
 import cv2
 # import time
 

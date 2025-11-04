@@ -1,25 +1,25 @@
-# more stability- removes a lot of fluctuations
+# more stability: removes a lot of fluctuations
 # BaslerYoloMeasurer.py
 import cv2, numpy as np
 from pypylon import pylon
 from ultralytics import YOLO
 from collections import deque
 
-# --- classes from your model ---
 CLASS_GROOVE = 0
 CLASS_WROD   = 1
 
-# --- smoothing / stability params (same semantics as in (2)) ---
 SMOOTH_BETA_X     = 0.90
 SMOOTH_BETA_CX    = 0.93
 SMOOTH_BETA_SCALE = 0.85
-MAX_JUMP_MM       = 0.10   # cap small jitter in mm for xL
-MAX_JUMP_CX_MM    = 0.08   # cap small jitter in mm for cx
-MEDIAN_CX_WIN     = 5      # median window for cx
-CONF_MARGIN       = 0.20   # for mask selection if you later switch to multi-groove
+MAX_JUMP_MM       = 0.10
+MAX_JUMP_CX_MM    = 0.08
+MEDIAN_CX_WIN     = 5
+CONF_MARGIN       = 0.20
 
 class Debounce1Px:
-    """Blocks single-pixel flicker unless it persists N frames."""
+    # to remove 1 pixel fluctuation. May be good, but may slow down fast changes in position
+    # but request was to remove those fluctuations
+    # accumulating predictions for previous frames if there are such
     def __init__(self, deadband_px=1, persist_frames=3):
         self.db = int(deadband_px)
         self.N  = int(persist_frames)
@@ -27,13 +27,11 @@ class Debounce1Px:
         self.hold_cnt = 0
 
     def step(self, prev_committed, candidate):
-        # accept immediately if outside deadband
         if prev_committed is None:
             return float(candidate)
         if abs(candidate - prev_committed) > self.db:
             self.hold_val = None; self.hold_cnt = 0
             return float(candidate)
-        # inside deadband → require persistence
         if self.hold_val is None or abs(candidate - self.hold_val) > 0.5:
             self.hold_val = float(candidate); self.hold_cnt = 1
             return float(prev_committed)
@@ -46,13 +44,10 @@ class Debounce1Px:
 class BaslerYoloMeasurer:
     def __init__(self, weights_path, electrode_diameter_mm=4.3, scale_mm_per_px=None,
                  draw_masks=True, draw_distance=True):
-        # --- model ---
         self.model = YOLO(weights_path)
-        # (GPU/half optional; keep default for widest compatibility)
         dummy = np.zeros((512, 512, 3), np.uint8)
         _ = self.model(dummy, verbose=False)  # warm-up
 
-        # --- camera ---
         tlf = pylon.TlFactory.GetInstance()
         self.cam = pylon.InstantCamera(tlf.CreateFirstDevice(tlf.EnumerateDevices()[0]))
         self.cam.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
@@ -60,13 +55,11 @@ class BaslerYoloMeasurer:
         self.converter.OutputPixelFormat = pylon.PixelType_BGR8packed
         self.converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
 
-        # --- config ---
         self.electrode_diameter_mm = float(electrode_diameter_mm)
         self.scale_mm_per_px_manual = scale_mm_per_px
         self.draw_masks = draw_masks
         self.draw_distance = draw_distance
 
-        # --- state for smoothing ---
         self.prev_cx = None
         self.prev_xL = None
         self.prev_mm_per_px = None
@@ -75,7 +68,6 @@ class BaslerYoloMeasurer:
         self.cx_db  = Debounce1Px(deadband_px=1, persist_frames=3)
         self.xL_db  = Debounce1Px(deadband_px=1, persist_frames=3)
 
-    # -------------- helpers --------------
     @staticmethod
     def _make_kalman_1d():
         k = cv2.KalmanFilter(2, 1)
@@ -167,7 +159,6 @@ class BaslerYoloMeasurer:
             return None
         return int(np.floor(min(xs)))
 
-    # -------------- main API --------------
     def measure(self, conf_thresh=0.3):
         grab = self.cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if not grab.GrabSucceeded():
@@ -190,7 +181,6 @@ class BaslerYoloMeasurer:
         width_px = max(1, x2 - x1)
         mm_per_px_raw = self.scale_mm_per_px_manual or (self.electrode_diameter_mm / float(width_px))
 
-        # Prefer contour intersection for xL (smoother edge); fallback to scanline search
         xL_raw = None
         contour_xy = self._outer_contour_from_mask(groove_mask)
         if contour_xy is not None:
@@ -200,16 +190,13 @@ class BaslerYoloMeasurer:
         if xL_raw is None:
             return None, frame
 
-        # Smooth mm/px
         mm_per_px = mm_per_px_raw if self.prev_mm_per_px is None else \
                     self._smooth(self.prev_mm_per_px, mm_per_px_raw, SMOOTH_BETA_SCALE)
 
-        # First frame: seed and return raw distance
         if self.prev_cx is None:
             self.prev_cx, self.prev_xL, self.prev_mm_per_px = float(cx_raw), float(xL_raw), float(mm_per_px)
             self.cx_buf.clear(); self.cx_buf.append(float(cx_raw))
             dist0 = abs(cx_raw - xL_raw) * mm_per_px
-            # optional draw
             vis = frame.copy()
             if self.draw_masks:
                 vis = cv2.addWeighted(vis, 0.6, res.plot(), 0.4, 0)
@@ -219,11 +206,9 @@ class BaslerYoloMeasurer:
                 cv2.line(vis, (int(xL_raw), int(cy)), (int(cx_raw), int(cy)), (0, 255, 0), 2)
             return dist0, vis
 
-        # Convert mm caps into pixels
         cap_px    = max(1, int(round(MAX_JUMP_MM    / max(mm_per_px, 1e-6))))
         cap_cx_px = max(1, int(round(MAX_JUMP_CX_MM / max(mm_per_px, 1e-6))))
 
-        # ----- cx: Kalman -> clamp -> debounce(1px) -> EWMA -> median -----
         _ = self.cx_kf.predict()
         meas = np.array([[np.float32(cx_raw)]])
         cx_corr = float(self.cx_kf.correct(meas)[0, 0])
@@ -233,14 +218,12 @@ class BaslerYoloMeasurer:
         self.cx_buf.append(cx_s)
         cx = float(np.median(self.cx_buf))
 
-        # ----- xL: clamp -> debounce(1px) -> EWMA -----
         xL_c = self._clamp_jump(self.prev_xL, xL_raw, cap_px)
         xL_c = self.xL_db.step(self.prev_xL, xL_c)
         xL   = self._smooth(self.prev_xL, xL_c, SMOOTH_BETA_X)
 
         distance_mm = abs(cx - xL) * mm_per_px
 
-        # ----- draw -----
         vis = frame.copy()
         if self.draw_masks:
             vis = cv2.addWeighted(vis, 0.6, res.plot(), 0.4, 0)
@@ -252,11 +235,9 @@ class BaslerYoloMeasurer:
                         ((int(round(xL)) + int(round(cx))) // 2, max(int(round(cy)) - 10, 0)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
 
-        # update state
         self.prev_cx, self.prev_xL, self.prev_mm_per_px = cx, xL, float(mm_per_px)
         return float(distance_mm), vis
 
-    # optional helper for raw display
     def show_one_frame(self):
         grab = self.cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if not grab.GrabSucceeded():
