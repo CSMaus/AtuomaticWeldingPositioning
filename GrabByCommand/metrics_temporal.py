@@ -57,6 +57,7 @@ class YoloFrameMeasurer:
 
         self.prev_ebox = None
         self.cx_buf.clear()
+        self.cx_kf = make_kalman_1d()
     @staticmethod
     def _resize_masks(res, H, W):
         if res.masks is None: return []
@@ -69,7 +70,7 @@ class YoloFrameMeasurer:
             m8 = cv2.resize(m8, (W, H), interpolation=cv2.INTER_NEAREST)
             out.append((c, m8, s))
         return out
-    @staticmethod
+    # @staticmethod
     def _best_wrod_bbox(self, res):  # this is new - recheck
         if res.boxes is None: return None
         xyxy = res.boxes.xyxy.cpu().numpy()
@@ -140,14 +141,15 @@ class YoloFrameMeasurer:
         groove_mc = [(m, s) for cid, m, s in masks if cid == CLASS_GROOVE]
         groove_mask = self._select_groove_mask(groove_mc)
 
-        ebox = self._best_wrod_bbox(self, res) # this is new - recheck
-        
+        ebox = self._best_wrod_bbox(res) # this is new - recheck
+
         if groove_mask is None or ebox is None:
             return False, {}, frame
         # # this is new - recheck
         self.prev_ebox = ebox
 
         x1, y1, x2, y2, _ = ebox
+        if x2 < x1: x1, x2 = x2, x1  # no bbox flip; todo: delete it later
         cx_raw, cy = (x1 + x2) // 2, (y1 + y2) // 2
         width_px = max(1, x2 - x1)
         mm_per_px_raw = self.scale_mm_per_px_manual or (self.electrode_diameter_mm / float(width_px))
@@ -158,6 +160,35 @@ class YoloFrameMeasurer:
             mm_per_px = mm_per_px_raw
         else:
             mm_per_px = self._smooth(self.prev_mm_per_px, mm_per_px_raw, SMOOTH_BETA_SCALE)
+        if self.prev_cx is None:
+            # ensure x1<=x2 just in case
+            if x2 < x1: x1, x2 = x2, x1
+            cx = float(cx_raw)
+            xL = float(xL_raw)
+            mm_per_px = float(mm_per_px_raw)
+
+            # seed state
+            self.cx_kf.statePost = np.array([[np.float32(cx)], [0.0]], dtype=np.float32)
+            self.prev_cx = cx
+            self.prev_xL = xL
+            self.prev_mm_per_px = mm_per_px
+            self.prev_ebox = (x1, y1, x2, y2, _)
+            self.cx_buf.clear();
+            self.cx_buf.append(cx)
+
+            distance_mm = abs(cx - xL) * mm_per_px
+            vis = frame.copy()
+            if self.draw_distance:
+                cv2.circle(vis, (int(cx), int(cy)), 5, (0, 0, 255), -1)
+                cv2.circle(vis, (int(xL), int(cy)), 5, (255, 0, 0), -1)
+                cv2.line(vis, (int(xL), int(cy)), (int(cx), int(cy)), (0, 255, 0), 2)
+                cv2.putText(vis, f"{distance_mm:.2f} mm",
+                            ((int(xL) + int(cx)) // 2, max(int(cy) - 10, 0)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
+            metrics = dict(xL_px=int(xL), cx_px=int(cx), cy_px=int(cy),
+                           mm_per_px=float(mm_per_px), dist_mm=float(distance_mm))
+            return True, metrics, vis
+
         cap_px = max(1, int(round(MAX_JUMP_MM / max(mm_per_px, 1e-6))))
         '''if self.prev_cx is None:
             cx = cx_raw
