@@ -153,7 +153,19 @@ class YoloFrameMeasurer:
         cx_raw, cy = (x1 + x2) // 2, (y1 + y2) // 2
         width_px = max(1, x2 - x1)
         mm_per_px_raw = self.scale_mm_per_px_manual or (self.electrode_diameter_mm / float(width_px))
-        xL_raw, xR, yy = self._edge_xs_at_y(groove_mask, cy, search=6)
+
+        # TODO: HUGE CHANGES to check
+        # xL_raw, xR, yy = self._edge_xs_at_y(groove_mask, cy, search=6)
+        contour_xy = self._outer_contour_from_mask(groove_mask)
+        xL_raw = None
+        if contour_xy is not None:
+            xL_raw = self._left_x_at_y_from_contour(contour_xy, cy)
+        if xL_raw is None:
+            xL_raw, _, _ = self._edge_xs_at_y(groove_mask, cy, search=6)
+        if xL_raw is None:
+            return False, {}, frame
+
+
         if xL_raw is None:
             return False, {}, frame
         if self.prev_mm_per_px is None:
@@ -161,13 +173,11 @@ class YoloFrameMeasurer:
         else:
             mm_per_px = self._smooth(self.prev_mm_per_px, mm_per_px_raw, SMOOTH_BETA_SCALE)
         if self.prev_cx is None:
-            # ensure x1<=x2 just in case
             if x2 < x1: x1, x2 = x2, x1
             cx = float(cx_raw)
             xL = float(xL_raw)
             mm_per_px = float(mm_per_px_raw)
 
-            # seed state
             self.cx_kf.statePost = np.array([[np.float32(cx)], [0.0]], dtype=np.float32)
             self.prev_cx = cx
             self.prev_xL = xL
@@ -230,6 +240,33 @@ class YoloFrameMeasurer:
         self.prev_mm_per_px = float(mm_per_px)
         metrics = dict(xL_px=int(round(xL)), cx_px=int(round(cx)), cy_px=int(cy), mm_per_px=float(mm_per_px), dist_mm=float(distance_mm))
         return True, metrics, vis
+
+    def _outer_contour_from_mask(self, bin_mask, eps_ratio=0.015):
+        m = cv2.medianBlur(bin_mask, 3)
+        cnts, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        if not cnts: return None
+        cnt = max(cnts, key=cv2.contourArea)
+        peri = cv2.arcLength(cnt, True)
+        approx = cv2.approxPolyDP(cnt, eps_ratio * peri, True)
+        return approx.reshape(-1, 2)  # (N,2) int
+
+    def _left_x_at_y_from_contour(self, contour_xy, y):
+        xs = []
+        Y = float(y)
+        pts = contour_xy
+        n = len(pts)
+        for i in range(n):
+            x1, y1 = pts[i]
+            x2, y2 = pts[(i + 1) % n]
+            if (y1 <= Y < y2) or (y2 <= Y < y1):
+                if y2 != y1:
+                    t = (Y - y1) / (y2 - y1)
+                    x = x1 + t * (x2 - x1)
+                    xs.append(x)
+        if not xs:
+            return None
+        return int(np.floor(min(xs)))
+
 
 # this is new - recheck
 def make_kalman_1d():
