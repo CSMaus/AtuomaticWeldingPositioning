@@ -7,7 +7,8 @@ from collections import deque
 CLASS_GROOVE = 0
 CLASS_WROD = 1
 
-VIDEO_PATH = r"D:\ML_DL_AI_stuff\!!DoosanWelding2025\data\Curve_250808\all move.mp4"
+# VIDEO_PATH = r"D:\ML_DL_AI_stuff\!!DoosanWelding2025\data\Curve_250808\all move.mp4"
+VIDEO_PATH = r"/Users/kseni/Documents/GitHub/AtuomaticWeldingPositioning/data/all move.mp4"
 # WEIGHTS_PATH = r"runs/segment/weld_seg_0911_1-/weights/best.pt"
 WEIGHTS_PATH = r"runs/segment/weld_seg_1103-2/weights/best.pt"
 CONF = 0.3
@@ -30,7 +31,7 @@ fps_list = []
 class YoloFrameMeasurer:
     def __init__(self, weights_path, electrode_diameter_mm=4.3, scale_mm_per_px=None, draw_masks=True, draw_distance=True):
         self.model = YOLO(weights_path)
-        self.model.to('cuda')
+        self.model.to('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.fuse()
         torch.backends.cudnn.benchmark = True  # it should be already in cuda, but anyway
         self.electrode_diameter_mm = float(electrode_diameter_mm)
@@ -417,6 +418,7 @@ def main():
         fps_m = 1.0 / max(1e-6, time.time() - t0)
         cv2.putText(vis, str(fps_m), (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,55,55), 2, cv2.LINE_AA)
         cv2.imshow("YOLO Video Measure", vis)
+
         fps_list.append(fps_m)
         # time.sleep(0.05)  # it slowed down the whole predictions - bcs I wanted to check without kalman and others
         # need to check fps
@@ -425,8 +427,9 @@ def main():
         row = dict(frame_index=frame_idx, t_sec=round(t_sec, 4))
         if okm: row.update(m)
         dyn_rows.append(row)
-        if cv2.waitKey(1) & 0xFF == 27:
+        if cv2.waitKey(1) & 0xFF == 27 or frame_idx >= 1505:
             break
+        print(frame_idx)
     cap.release()
     cv2.destroyAllWindows()
     if len(dyn_rows) > 0:

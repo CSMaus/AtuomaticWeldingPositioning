@@ -44,3 +44,5 @@ GrabByCommand/metrics_dynamic.csv
 /yolo1031/dataset
 /yolo1031/runs
 yolo1031/temp_config.yaml
+/report
+icon.svg
