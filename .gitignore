@@ -46,3 +46,5 @@ GrabByCommand/metrics_dynamic.csv
 yolo1031/temp_config.yaml
 /report
 icon.svg
+/yolo1031/dataset_non_welding
+/yolo1031/.idea
