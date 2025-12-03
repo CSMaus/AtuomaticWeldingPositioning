@@ -1,4 +1,3 @@
-# BaslerYoloMeasurer
 import cv2, numpy as np
 from pypylon import pylon
 from ultralytics import YOLO
@@ -6,8 +5,14 @@ from ultralytics import YOLO
 CLASS_GROOVE = 0
 CLASS_WROD = 1
 
+# new params for smoothing left groove edge detection (to remove fluctuation and spikes)
+SMOOTH_BETA_X = 0.85
+MAX_JUMP_MM = 0.1
+MIN_JUMP_MM = 0.31
+
+
 class BaslerYoloMeasurer:
-    def __init__(self, weights_path, electrode_diameter_mm=4.3, scale_mm_per_px=None, draw_masks=True, draw_distance=True):
+    def __init__(self, weights_path, electrode_diameter_mm=4.5, scale_mm_per_px=None, draw_masks=True, draw_distance=True):
         self.model = YOLO(weights_path)
         tlf = pylon.TlFactory.GetInstance()
         devices = tlf.EnumerateDevices()
@@ -23,6 +28,9 @@ class BaslerYoloMeasurer:
         self.draw_distance = draw_distance
         dummy = np.zeros((512,512,3), dtype=np.uint8)
         _ = self.model(dummy, verbose=False)  # warm-up
+
+        self.prev_xL = None
+
 
     def _resize_masks(self, res, H, W):
         if res.masks is None: return []
@@ -67,6 +75,25 @@ class BaslerYoloMeasurer:
         new_h = (h // 32) * 16
         new_w = (w // 32) * 16
         return cv2.resize(image, (new_w, new_h))
+    
+    @staticmethod
+    def _smooth(prev, new, beta):
+        return int(beta * prev + (1 - beta) * new)
+
+    @staticmethod
+    def _clamp_jump(prev, new, max_jump):
+        if abs(new - prev) > max_jump:
+            return prev + np.sign(new - prev) * max_jump
+        return new
+    
+    @staticmethod
+    def _clamp_smooth(prev, new, min_jump_ignore, beta):
+        if abs(new - prev) < min_jump_ignore:
+            return int(beta * prev + (1 - beta) * new)
+            # return prev + np.sign(new - prev) * max_jump
+        else:
+            return int((1 - beta) * prev + beta * new)
+        # return new
 
     def measure(self, conf_thresh = 0.3):
         """
@@ -81,7 +108,7 @@ class BaslerYoloMeasurer:
         # frame = img.GetArray()
         grabResult = self.cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if not grabResult.GrabSucceeded():
-            return None, None
+            return 100, None
 
         image = self.converter.Convert(grabResult)
         frame = image.GetArray()
@@ -94,20 +121,35 @@ class BaslerYoloMeasurer:
         groove_mask = self._pick_largest(groove_masks)
         ebox = self._best_wrod_bbox(res)
         if groove_mask is None or ebox is None:
-            return None, frame
+            # cv2.imshow('Image Test', frame)
+            # cv2.waitKey(0)
+            return 100, frame
 
         x1, y1, x2, y2, _ = ebox
         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
         width_px = max(1, x2 - x1)
         mm_per_px = self.scale_mm_per_px_manual or (self.electrode_diameter_mm / float(width_px))
-        xL, xR, yy = self._edge_xs_at_y(groove_mask, cy, search=6)
-        if xL is None:
-            return None, frame
+        xL_raw, _, _ = self._edge_xs_at_y(groove_mask, cy, search=6)
+        if xL_raw is None:
+            return 100, frame
+
+
+        # new code for smoothing left groove edge detection
+        # to turn it off, comment out few lines below
+        # and change xL_raw definistion above to be xL: xL_raw -> xL
+        if self.prev_xL is None:
+            self.prev_xL = xL_raw
+        cap_px = max(1, int(round(MAX_JUMP_MM / max(mm_per_px, 1e-6))))
+        # xL_c = self._clamp_jump(self.prev_xL, xL_raw, cap_px)
+        # xL = self._smooth(self.prev_xL, xL_raw, SMOOTH_BETA_X)
+        xL = self._clamp_smooth(self.prev_xL, xL_raw, MIN_JUMP_MM, SMOOTH_BETA_X)
 
         distance_mm = abs(cx - xL) * mm_per_px
 
         # draw masks and line of measured distance in  frame
         frame = cv2.addWeighted(frame, 0.6, res.plot(), 0.4, 0)
+        print("xL: ", xL)
+        print("xL vaariable type: ", type(xL))
         cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)
         cv2.circle(frame, (xL, cy), 5, (255, 0, 0), -1)
         cv2.line(frame, (xL, cy), (cx, cy), (0, 255, 0), 2)
