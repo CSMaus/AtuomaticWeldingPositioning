@@ -1,22 +1,18 @@
 # this script is to save frames pressing s button
 # for press s will be saved 2 frames -: cam1 and cam2
 
-
-# extract_frames_two_cams.py
 import cv2
 import os
 import numpy as np
 
-VIDEO_PATH = "your_video.mkv"
-OUTPUT_DIR = "saved_frames"
+VIDEO_PATH = "original_video/20251023-1_08-1_17.mkv"
+OUTPUT_DIR = "saved_frames/" + VIDEO_PATH.replace("original_video/", "").replace(".mkv", "")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# ---- paste values from define_crop.py output here ----
-TOP    = 0
-BOTTOM = 0
-LEFT   = 0
-RIGHT  = 0
-# ------------------------------------------------------
+TOP    = 107
+BOTTOM = 191
+LEFT   = 78
+RIGHT  = 101
 
 cap = cv2.VideoCapture(VIDEO_PATH)
 if not cap.isOpened():
@@ -50,7 +46,6 @@ def crop_and_split(frame):
 def on_trackbar(pos):
     global current_frame, paused, last_cam1, last_cam2
     current_frame = pos
-    paused = True
     cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
     ret, frame = cap.read()
     if ret:
@@ -73,9 +68,12 @@ while True:
         combined = np.hstack((cam1, cam2))
         cv2.imshow("Video_2cams", combined)
 
-    key = cv2.waitKey(30) & 0xFF
-    if key == 27:   # ESC
+    key = cv2.waitKey(1) & 0xFF
+    if key == 27 or key == ord('q'):
+        cap.release()
+        cv2.destroyAllWindows()
         break
+
     elif key == ord(' '):
         paused = not paused
     elif key == ord('s') and last_cam1 is not None and last_cam2 is not None:
