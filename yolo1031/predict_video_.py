@@ -90,15 +90,17 @@ def predict_video():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(script_dir)
     data_dir = Path.cwd().parents[2] / "data"
-    videos_dir  = os.path.join(data_dir, "Curve_250808")
+    # videos_dir  = os.path.join(data_dir, "Curve_250808")
+    videos_dir  = "D:\ML_DL_AI_stuff\!!DoosanWelding2025\code\AtuomaticWeldingPositioning\DS_collection\original_video"
 
-    vids = [f for f in os.listdir(videos_dir) if f.lower().endswith(('.mp4','.avi','.mov'))]
+    vids = [f for f in os.listdir(videos_dir) if f.lower().endswith(('.mp4','.avi','.mov','.mkv'))]
     if not vids: print("No videos found!"); return
     for i, v in enumerate(vids): print(f"{i}: {v}")
     idx = int(input("Enter video index: "))
     video_path = os.path.join(videos_dir, vids[idx])
 
-    model_path = os.path.join(script_dir, "runs", "segment", "weld_seg_1031_1-", "weights", "best.pt")
+    # model_path = os.path.join(script_dir, "runs", "segment", "weld_seg_1031_1-", "weights", "best.pt")
+    model_path = os.path.join(script_dir, "runs", "segment", "welding_seg_1203-", "weights", "best.pt")
     if not os.path.exists(model_path): print("Trained model not found!"); return
     model = YOLO(model_path)
     _ = model(np.zeros((512,512,3), dtype=np.uint8), verbose=False)
