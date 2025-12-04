@@ -6,14 +6,16 @@ CLASS_GROOVE = 0
 CLASS_WROD = 1
 
 # new params for smoothing left groove edge detection (to remove fluctuation and spikes)
-SMOOTH_BETA_X = 0.85
-MAX_JUMP_MM = 0.1
-MIN_JUMP_MM = 0.31
+SMOOTH_BETA_X = 0.85  # parameter used for smoothing predictions. read "_clamp_smooth" static method
+MAX_JUMP_MM = 0.1  # not used
+MIN_JUMP_MM = 0.31  # if the difference beveen predictions in current and previous frames less, do smoothing
 
 
 class BaslerYoloMeasurer:
     def __init__(self, weights_path, electrode_diameter_mm=4.5, scale_mm_per_px=None, draw_masks=True, draw_distance=True):
         self.model = YOLO(weights_path)
+
+        # define fields to connect camera properly
         tlf = pylon.TlFactory.GetInstance()
         devices = tlf.EnumerateDevices()
         self.cam = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice(devices[0]))
@@ -22,10 +24,13 @@ class BaslerYoloMeasurer:
         self.converter.OutputPixelFormat = pylon.PixelType_BGR8packed
         self.converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
 
+        # define parameters for NN prediction and detections
         self.electrode_diameter_mm = float(electrode_diameter_mm)
         self.scale_mm_per_px_manual = scale_mm_per_px
         self.draw_masks = draw_masks
         self.draw_distance = draw_distance
+
+        # warm-up the model so it will not freeze in the beginning
         dummy = np.zeros((512,512,3), dtype=np.uint8)
         _ = self.model(dummy, verbose=False)  # warm-up
 
@@ -33,6 +38,7 @@ class BaslerYoloMeasurer:
 
 
     def _resize_masks(self, res, H, W):
+        """ resize mask from YOLO input image size to the original size from camera"""
         if res.masks is None: return []
         raw = res.masks.data.cpu().numpy()
         cls_ids = res.boxes.cls.cpu().numpy().astype(int)
@@ -49,6 +55,7 @@ class BaslerYoloMeasurer:
         return (masks[int(np.argmax(areas))] > 0).astype(np.uint8)
 
     def _best_wrod_bbox(self, res):
+        """ sort all predictions to take best"""
         if res.boxes is None: return None
         xyxy = res.boxes.xyxy.cpu().numpy()
         cls_ = res.boxes.cls.cpu().numpy().astype(int)
@@ -88,6 +95,10 @@ class BaslerYoloMeasurer:
     
     @staticmethod
     def _clamp_smooth(prev, new, min_jump_ignore, beta):
+        """ apply smooting of predicted left groove edge value
+        by using previous prediction
+        but we apply smoothing only in case, if the difference between predicted groove edge value in
+        current frame and previous frame is less than min_jump_ignore """
         if abs(new - prev) < min_jump_ignore:
             return int(beta * prev + (1 - beta) * new)
             # return prev + np.sign(new - prev) * max_jump
@@ -102,19 +113,18 @@ class BaslerYoloMeasurer:
         :param conf_thresh: confidence threshold. All predictions below it will not be displayed
         :return:
         """
-        # grab = self.cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
-        # if not grab.GrabSucceeded(): return None
-        # img = self.converter.Convert(grab)
-        # frame = img.GetArray()
+
+        # _____________________ get image (frame) from camera
         grabResult = self.cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if not grabResult.GrabSucceeded():
             return 100, None
-
         image = self.converter.Convert(grabResult)
         frame = image.GetArray()
         # frame = self.resize_to_32_multiple(frame)  # no need for this
         H, W = frame.shape[:2]
+        # _____________________
 
+        # ____________ make predictions and get results with confidence more than threshold (default 0.5)
         res = self.model(frame, verbose=False, conf=conf_thresh)[0]
         masks = self._resize_masks(res, H, W)
         groove_masks = [m for cid, m in masks if cid == CLASS_GROOVE]
@@ -125,6 +135,8 @@ class BaslerYoloMeasurer:
             # cv2.waitKey(0)
             return 100, frame
 
+        # _____________________  using known width of W-Rod in mm (self.electrode_diameter_mm) we define:
+        # how many mm is in one pixel, so we could calculate distance between W-Rod and left groove edge
         x1, y1, x2, y2, _ = ebox
         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
         width_px = max(1, x2 - x1)
@@ -146,7 +158,7 @@ class BaslerYoloMeasurer:
 
         distance_mm = abs(cx - xL) * mm_per_px
 
-        # draw masks and line of measured distance in  frame
+        # ____________________ draw masks and line of measured distance in  frame
         frame = cv2.addWeighted(frame, 0.6, res.plot(), 0.4, 0)
         print("xL: ", xL)
         print("xL vaariable type: ", type(xL))
@@ -159,7 +171,8 @@ class BaslerYoloMeasurer:
         return distance_mm, frame
 
     def show_one_frame(self):
-        # in case if need to grab and display image without
+        # in case if need to grab and display image without making any predictions
+        # this function tested to check clear camera speed (FPS) without NN
         grab = self.cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
         if not grab.GrabSucceeded():
             return None
